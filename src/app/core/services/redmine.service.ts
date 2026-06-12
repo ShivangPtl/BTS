@@ -1,6 +1,6 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, catchError, map, of } from 'rxjs';
+import { Observable, catchError, expand, map, of, reduce, takeWhile } from 'rxjs';
 import {
   CapacitySnapshot,
   PublicHoliday,
@@ -85,9 +85,18 @@ export class RedmineService {
               ]
             },
             {
-              id: 103,
-              redmineUserId: 103,
-              name: 'Rahul Mehta',
+              id: 104,
+              redmineUserId: 104,
+              name: 'Rahul Giri',
+              designation: 'Developer',
+              role: 'Developer',
+              reportsTo: 20,
+              dailyHours: 8
+            },
+            {
+              id: 105,
+              redmineUserId: 105,
+              name: 'Nilkanth Pund',
               designation: 'Developer',
               role: 'Developer',
               reportsTo: 20,
@@ -271,7 +280,7 @@ export class RedmineService {
 
   getSpentTime(startDate: string, endDate: string, projectId = 'all'): Observable<TimeEntry[]> {
     if (!this.hasApiKey()) {
-      // mock path — add userName to mock data too (see step 3)
+      // mock path remains identical
       const start = this.toDate(startDate);
       const end = this.toDate(endDate);
       return of(
@@ -284,29 +293,57 @@ export class RedmineService {
       );
     }
 
-    const params = [
-      `spent_on=><${startDate}|${endDate}`,
-      projectId !== 'all' ? `project_id=${projectId}` : '',
-      `limit=100`
-    ].filter(Boolean).join('&');
+    const PAGE_LIMIT = 100;
 
-    return this.http.get<{ time_entries: any[] }>(
-      `${this.apiBaseUrl}/time_entries.json?${params}`,
-      { headers: this.getHeaders() }
-    ).pipe(
-      map(res => res.time_entries.map(e => ({
-        id: e.id,
-        userId: e.user.id,
-        userName: e.user.name,          // ← here
-        redmineUserId: e.user.id,
-        projectId: e.project.id,
-        sprintId: 0,
-        issueId: e.issue?.id ?? 0,
-        issueSubject: e.comments ?? '',
-        issueType: e.activity?.name ?? 'Task',
-        hours: e.hours,
-        spentOn: e.spent_on
-      }))),
+    // 1. Build base query parameters
+    let queryParams = new HttpParams()
+      .set('spent_on', `><${startDate}|${endDate}`)
+      .set('limit', PAGE_LIMIT.toString());
+
+    if (projectId !== 'all') {
+      queryParams = queryParams.set('project_id', projectId);
+    }
+
+    // Helper to execute a single page HTTP request
+    const fetchPage = (offset: number) => {
+      const paramsWithOffset = queryParams.set('offset', offset.toString());
+      return this.http.get<{ time_entries: any[]; total_count: number }>(
+        `${this.apiBaseUrl}/time_entries.json`,
+        { headers: this.getHeaders(), params: paramsWithOffset }
+      );
+    };
+
+    // 2. Multi-page pagination stream using RxJS expand
+    return fetchPage(0).pipe(
+      expand((res, index) => {
+        const nextOffset = (index + 1) * PAGE_LIMIT;
+        // If the current offset + items fetched is less than total_count, fetch next page
+        if (nextOffset < res.total_count) {
+          return fetchPage(nextOffset);
+        }
+        // Otherwise, complete the pagination stream
+        return of(null);
+      }),
+      // Stop the stream when expand returns of(null)
+      takeWhile((res): res is NonNullable<typeof res> => res !== null),
+      // Map individual API entries to your frontend model format per page
+      map(res => {
+        return res.time_entries.map(e => ({
+          id: e.id,
+          userId: e.user.id,
+          userName: e.user.name,
+          redmineUserId: e.user.id,
+          projectId: e.project.id,
+          sprintId: 0,
+          issueId: e.issue?.id ?? 0,
+          issueSubject: e.comments ?? '',
+          issueType: e.activity?.name ?? 'Task',
+          hours: e.hours,
+          spentOn: e.spent_on
+        }));
+      }),
+      // Combine arrays from all pages back into a single flat array
+      reduce((accumulator, currentBatch) => accumulator.concat(currentBatch), [] as TimeEntry[]),
       catchError(error => {
         console.warn('Redmine time entries API failed. Falling back to mock.', error);
         return of(this.timeEntries);

@@ -42,12 +42,12 @@
 
     <div class="filter-group">
       <span class="filter-label">From</span>
-      <input type="date" [(ngModel)]="startDate" (change)="filterChange.emit()">
+      <input type="date" [ngModel]="startDate" (ngModelChange)="startDateChange.emit($event); filterChange.emit()">
     </div>
 
     <div class="filter-group">
       <span class="filter-label">To</span>
-      <input type="date" [(ngModel)]="endDate" (change)="filterChange.emit()">
+      <input type="date" [ngModel]="endDate" (ngModelChange)="endDateChange.emit($event); filterChange.emit()">
     </div>
 
     <div class="filter-sep"></div>

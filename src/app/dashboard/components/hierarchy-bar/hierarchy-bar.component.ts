@@ -115,14 +115,19 @@ export class HierarchyBarComponent implements OnChanges {
   private buildRow(node: UserNode, isAncestor: boolean): ChartRow {
     const ownBudget   = this.workingDays * (node.dailyHours ?? 8);
     const ownLogged   = this.ownEntries(node).reduce((s, e) => s + e.hours, 0);
-    const teamBudget  = this.subtreeBudget(node) - ownBudget;
-    const teamLogged  = this.subtreeLogged(node) - ownLogged;
+    const teamBudget  = isAncestor ? 0 : this.subtreeBudget(node) - ownBudget;
+    const teamLogged  = isAncestor ? 0 : this.subtreeLogged(node) - ownLogged;
     const totalBudget = ownBudget + teamBudget;
     const totalLogged = ownLogged + teamLogged;
+    const totalReporteesCount = this.countAllReportees(node);
+
+    const properNameLabel = totalReporteesCount > 0 && !isAncestor
+      ? `${node.name} (+${totalReporteesCount})`
+      : node.name;
 
     return {
       id: node.id,
-      name: node.name,
+      name: properNameLabel,
       designation: node.designation,
       role: node.role,
       ownBudget,
@@ -147,15 +152,24 @@ export class HierarchyBarComponent implements OnChanges {
     return own + team;
   }
 
+  private countAllReportees(node: UserNode): number {
+    if (!node.directReports || node.directReports.length === 0) {
+      return 0;
+    }
+
+    // Count the direct reports + recursively count each of their reportees
+    return node.directReports.reduce((total, child) => {
+      return total + 1 + this.countAllReportees(child);
+    }, 0);
+  }
+
   // ── Chart config ─────────────────────────────────────────────────────────
   private buildChart(): void {
-    const labels     = this.currentRows.map(r => r.name);
-    const ownLogged  = this.currentRows.map(r => r.ownLogged);
-    const teamLogged = this.currentRows.map(r => r.teamLogged);
-    const ownBudget  = this.currentRows.map(r => r.ownBudget);
-    const teamBudget = this.currentRows.map(r => r.teamBudget);
+    const labels = this.currentRows.map(r => r.name);
+    const totalLogged = this.currentRows.map(r => r.ownLogged + r.teamLogged);
+    const totalBudget = this.currentRows.map(r => r.ownBudget + r.teamBudget);
 
-    // ancestor bar gets a distinct amber color
+    // ancestor bar = amber, everyone else = blue
     const loggedColors = this.currentRows.map(r =>
       r.isAncestor ? '#f59e0b' : '#2563eb'
     );
@@ -165,15 +179,27 @@ export class HierarchyBarComponent implements OnChanges {
 
     this.chartOptions = {
       series: [
-        { name: 'Own Logged',   data: ownLogged  },
-        { name: 'Team Logged',  data: teamLogged },
-        { name: 'Own Budget',   data: ownBudget  },
-        { name: 'Team Budget',  data: teamBudget },
+        {
+          name: 'Logged',
+          data: totalLogged.map((val, i) => ({
+            x: labels[i],
+            y: val,
+            fillColor: loggedColors[i]
+          }))
+        },
+        {
+          name: 'Budget',
+          data: totalBudget.map((val, i) => ({
+            x: labels[i],
+            y: val,
+            fillColor: budgetColors[i]
+          }))
+        }
       ],
       chart: {
         type: 'bar',
         height: 320,
-        stacked: true,
+        stacked: false,
         fontFamily: 'Inter, Segoe UI, sans-serif',
         toolbar: { show: false },
         events: {
@@ -183,30 +209,26 @@ export class HierarchyBarComponent implements OnChanges {
           }
         }
       },
-      // 4 series → 4 color arrays, ApexCharts picks per-bar from distributed
-      colors: [
-        ({ dataPointIndex }: any) => loggedColors[dataPointIndex],
-        ({ dataPointIndex }: any) => loggedColors[dataPointIndex] + '99',   // team logged = semi-transparent
-        ({ dataPointIndex }: any) => budgetColors[dataPointIndex],
-        ({ dataPointIndex }: any) => budgetColors[dataPointIndex],
-      ],
+      colors: ['#2563eb', '#cbd5e1'],   // fallback, overridden per-bar above
       plotOptions: {
         bar: {
           horizontal: false,
           columnWidth: '52%',
-          borderRadius: 0,
+          borderRadius: 5,
           borderRadiusApplication: 'end',
-          borderRadiusWhenStacked: 'last',
           distributed: false,
         }
       },
       dataLabels: {
         enabled: true,
-        enabledOnSeries: [0, 1],   // only show labels on logged series
         formatter: (val: number) => val > 0 ? `${val}h` : '',
-        style: { fontSize: '10px', fontWeight: 800, colors: ['#fff'] }
+        style: {
+          fontSize: '11px',
+          fontWeight: 800,
+          colors: ['#fff', '#475569']
+        }
       },
-      stroke: { width: 1, colors: ['#ffffff'] },
+      stroke: { width: 2, colors: ['#ffffff'] },
       xaxis: {
         categories: labels,
         labels: { style: { colors: '#475569', fontSize: '12px', fontWeight: 700 } }
@@ -225,27 +247,27 @@ export class HierarchyBarComponent implements OnChanges {
       tooltip: {
         custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
           const r = this.currentRows[dataPointIndex];
-          const totalLogged = r.ownLogged + r.teamLogged;
-          const totalBudget = r.ownBudget + r.teamBudget;
+          const tl = r.ownLogged + r.teamLogged;
+          const tb = r.ownBudget + r.teamBudget;
           return `
-            <div class="chart-tooltip">
-              <strong>${r.name}</strong>
-              <span>${r.designation}</span>
-              <p>Own: ${r.ownLogged}h logged / ${r.ownBudget}h budget</p>
-              ${r.teamBudget > 0 ? `<p>Team: ${r.teamLogged}h logged / ${r.teamBudget}h budget</p>` : ''}
-              <p>Total: ${totalLogged}h / ${totalBudget}h &nbsp;<b>${r.utilization}%</b></p>
-            </div>`;
+          <div class="chart-tooltip">
+            <strong>${r.name}</strong>
+            <span>${r.designation}</span>
+            <p>Logged: ${tl}h &nbsp;|&nbsp; Budget: ${tb}h</p>
+            <p>Utilization: <b>${r.utilization}%</b></p>
+            ${r.teamBudget > 0 ? `<p style="color:#94a3b8;font-size:11px">Own: ${r.ownLogged}h &nbsp;+&nbsp; Team: ${r.teamLogged}h</p>` : ''}
+          </div>`;
         }
       },
       annotations: {
-        xaxis: this.currentRows.map((r, i) => ({
+        xaxis: this.currentRows.map(r => ({
           x: r.name,
           label: {
             text: `${r.utilization}%`,
             position: 'top',
             orientation: 'horizontal',
             style: {
-              fontSize: '10px',
+              fontSize: '11px',
               fontWeight: 800,
               color: r.utilization >= 90 ? '#16a34a' : r.utilization >= 70 ? '#d97706' : '#dc2626',
               background: 'transparent',
