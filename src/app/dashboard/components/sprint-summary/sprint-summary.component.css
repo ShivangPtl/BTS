@@ -1,0 +1,99 @@
+.sprint-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 15px;
+}
+
+.sprint-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.sprint-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.sprint-card-header h4 {
+  margin: 0;
+  color: #2d3748;
+  font-size: 1.1rem;
+}
+
+.sprint-badge {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  background: #eaf2ff;
+  color: #3182ce;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.sprint-total-banner {
+  background: #f7fafc;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.total-count {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.total-label {
+  font-size: 0.8rem;
+  color: #718096;
+  line-height: 1.2;
+}
+
+.metrics-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #4a5568;
+  padding: 4px 0;
+}
+
+.label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.color-story { background-color: #9f7aea; } /* Purple */
+.color-task { background-color: #4299e1; }  /* Blue */
+.color-cr { background-color: #ed8936; }    /* Orange */
+.color-bug { background-color: #e53e3e; }   /* Red */
+
+.count-val {
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.alert-text {
+  color: #e53e3e;
+}

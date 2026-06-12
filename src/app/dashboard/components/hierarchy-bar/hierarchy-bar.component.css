@@ -1,0 +1,193 @@
+.hierarchy-widget {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+/* ── Toolbar ── */
+.chart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.crumb-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.crumb-sep {
+  color: #94a3b8;
+}
+
+.crumb-active {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mode-pill {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Chart ── */
+.chart-body {
+  min-height: 320px;
+}
+
+/* ── Entry section ── */
+.entry-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.entry-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  flex-wrap: wrap;
+}
+
+.focused-person strong {
+  display: block;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.focused-person span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.focused-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.focused-stats > div {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.focused-stats span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.focused-stats strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.focused-stats strong.green { color: #16a34a; }
+.focused-stats strong.amber { color: #d97706; }
+.focused-stats strong.red   { color: #dc2626; }
+
+/* ── Entry list ── */
+.entry-list {
+  overflow-x: auto;
+}
+
+.entry-row {
+  min-width: 620px;
+  display: grid;
+  grid-template-columns: 110px 130px minmax(240px, 1fr) 70px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.entry-row:last-child { border-bottom: 0; }
+
+.entry-row.head {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+mark {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.empty-note {
+  margin: 0;
+  padding: 14px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* ── Tooltip ── */
+::ng-deep .chart-tooltip {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+::ng-deep .chart-tooltip span { color: #64748b; font-size: 12px; }
+::ng-deep .chart-tooltip p { margin: 0; font-size: 12px; }
+::ng-deep .chart-tooltip b { color: #2563eb; }
+
+@media (max-width: 760px) {
+  .chart-toolbar,
+  .crumb-area,
+  .entry-section-header { flex-direction: column; align-items: stretch; }
+  .focused-stats { justify-content: space-between; }
+}

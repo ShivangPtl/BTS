@@ -1,0 +1,298 @@
+:host {
+  display: block;
+}
+
+.topnav {
+  background: #101827;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Top row ── */
+.topnav-top {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 0;
+  border-bottom: 1px solid #1f2937;
+}
+
+/* ── Brand ── */
+.topnav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-right: 28px;
+}
+
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 900;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.brand-copy strong {
+  display: block;
+  color: #f9fafb;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.brand-copy span {
+  display: block;
+  color: #4b5563;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* ── Nav links ── */
+.topnav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.topnav-links button {
+  height: 34px;
+  padding: 0 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+  white-space: nowrap;
+}
+
+.topnav-links button:hover {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+
+.topnav-links button.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* ── User ── */
+.topnav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 20px;
+  border-left: 1px solid #1f2937;
+}
+
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #1e40af;
+  color: #bfdbfe;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.user-info span {
+  display: block;
+  color: #4b5563;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.user-info strong {
+  display: block;
+  color: #f9fafb;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.logout-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ── Filter row ── */
+.topnav-filters {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+  background: #0d1520;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.filter-label {
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.filter-group select,
+.filter-group input[type="date"] {
+  height: 28px;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  background: #1a2535;
+  color: #e2e8f0;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.14s, background 0.14s;
+}
+
+.filter-group select:hover,
+.filter-group input[type="date"]:hover {
+  border-color: #374151;
+  background: #1f2d3d;
+}
+
+.filter-group select:focus,
+.filter-group input[type="date"]:focus {
+  border-color: #2563eb;
+  background: #1e2d47;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.filter-group input[type="date"] {
+  width: 130px;
+  color-scheme: dark;
+}
+
+.filter-sep {
+  width: 1px;
+  height: 20px;
+  background: #1f2937;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Active project chip */
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: 999px;
+  padding: 0 8px 0 10px;
+  height: 24px;
+}
+
+.filter-chip span {
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.filter-chip button {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  line-height: 1;
+}
+
+.filter-spacer {
+  flex: 1;
+}
+
+/* API status dot */
+.filter-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 5px #16a34a;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .topnav-filters {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    gap: 8px;
+  }
+
+  .filter-spacer { display: none; }
+}
+
+@media (max-width: 760px) {
+  .topnav-top {
+    padding: 0 16px;
+    flex-wrap: wrap;
+    height: auto;
+    padding-block: 10px;
+    gap: 10px;
+  }
+
+  .topnav-links {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .topnav-user { margin-left: auto; }
+  .user-info { display: none; }
+  .brand-copy span { display: none; }
+}

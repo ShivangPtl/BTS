@@ -1,0 +1,9 @@
+{
+  "/redmine-api": {
+    "target": "https://bts.promptdairytech.com",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/redmine-api": "" },
+    "logLevel": "debug"
+  }
+}

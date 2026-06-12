@@ -1,0 +1,206 @@
+<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed">
+  <app-navbar
+    [selectedView]="selectedView"
+    [loggedInUser]="loggedInUser"
+    [projects]="projects"
+    [apiStatus]="apiStatus"
+    [(selectedProjectId)]="selectedProjectId"
+    [(startDate)]="startDate"
+    [(endDate)]="endDate"
+    (selectedViewChange)="selectedView = $event"
+    (filterChange)="onFilterChange()">
+  </app-navbar>
+
+  <main class="page">
+
+    <section class="kpi-grid" aria-label="Capacity KPIs">
+      <article class="kpi-card" *ngFor="let card of kpiCards" [class]="card.tone">
+        <span>{{ card.label }}</span>
+        <strong>{{ card.value }}</strong>
+        <small>{{ card.helper }}</small>
+      </article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel large">
+        <div class="panel-header">
+          <div>
+            <span class="panel-kicker">Clickable hierarchy</span>
+            <h2>Manager capacity vs Redmine logged hours</h2>
+          </div>
+          <span class="metric-pill">{{ utilization }}% utilized</span>
+        </div>
+
+        <app-hierarchy-bar
+          [nodes]="hierarchy"
+          [workingDays]="capacity.workingDays"
+          [timeEntries]="timeEntries">
+        </app-hierarchy-bar>
+      </article>
+
+      <aside class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Holiday adjustment</span>
+            <h2>Budget calculation</h2>
+          </div>
+        </div>
+
+        <div class="budget-stack">
+          <div>
+            <span>Gross capacity</span>
+            <strong>{{ capacity.grossHours }}h</strong>
+          </div>
+          <div>
+            <span>Public holiday deduction</span>
+            <strong>{{ capacity.holidayDeductionHours }}h</strong>
+          </div>
+          <div class="total">
+            <span>Final budget</span>
+            <strong>{{ capacity.budgetHours }}h</strong>
+          </div>
+        </div>
+
+        <div class="holiday-list">
+          <p *ngIf="visibleHolidays.length === 0">No public holiday inside this range.</p>
+          <div *ngFor="let holiday of visibleHolidays">
+            <strong>{{ holiday.date }}</strong>
+            <span>{{ holiday.name }}</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="chart-grid">
+      <article class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Project-wise</span>
+            <h2>Logged effort</h2>
+          </div>
+        </div>
+        <apx-chart
+          *ngIf="projectChartOptions"
+          [series]="projectChartOptions.series"
+          [chart]="projectChartOptions.chart"
+          [colors]="projectChartOptions.colors"
+          [plotOptions]="projectChartOptions.plotOptions"
+          [dataLabels]="projectChartOptions.dataLabels"
+          [xaxis]="projectChartOptions.xaxis"
+          [yaxis]="projectChartOptions.yaxis"
+          [grid]="projectChartOptions.grid"
+          [tooltip]="projectChartOptions.tooltip">
+        </apx-chart>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Task mix</span>
+            <h2>Stories, tasks, bugs, CRs</h2>
+          </div>
+        </div>
+        <apx-chart
+          *ngIf="issueChartOptions"
+          [series]="issueChartOptions.series"
+          [chart]="issueChartOptions.chart"
+          [labels]="issueChartOptions.labels"
+          [colors]="issueChartOptions.colors"
+          [legend]="issueChartOptions.legend"
+          [dataLabels]="issueChartOptions.dataLabels"
+          [tooltip]="issueChartOptions.tooltip">
+        </apx-chart>
+      </article>
+
+      <article class="panel wide">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Date-wise</span>
+            <h2>Daily budget vs logged time</h2>
+          </div>
+        </div>
+        <apx-chart
+          *ngIf="dateTrendOptions"
+          [series]="dateTrendOptions.series"
+          [chart]="dateTrendOptions.chart"
+          [colors]="dateTrendOptions.colors"
+          [stroke]="dateTrendOptions.stroke"
+          [markers]="dateTrendOptions.markers"
+          [xaxis]="dateTrendOptions.xaxis"
+          [yaxis]="dateTrendOptions.yaxis"
+          [grid]="dateTrendOptions.grid"
+          [tooltip]="dateTrendOptions.tooltip">
+        </apx-chart>
+      </article>
+    </section>
+
+    <section class="table-grid">
+      <article class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Sprint-wise</span>
+            <h2>Sprint health</h2>
+          </div>
+        </div>
+
+        <div class="data-table">
+          <div class="table-row head">
+            <span>Sprint</span>
+            <span>Status</span>
+            <span>Issues</span>
+            <span>Open</span>
+            <span>Bug / CR / Story</span>
+            <span>Logged</span>
+          </div>
+          <div class="table-row" *ngFor="let sprint of sprints">
+            <span>
+              <strong>{{ sprint.name }}</strong>
+              <small>{{ sprint.startDate }} to {{ sprint.endDate }}</small>
+            </span>
+            <span><mark>{{ sprint.status }}</mark></span>
+            <span>{{ sprint.totalIssues }}</span>
+            <span>{{ sprint.openIssues }}</span>
+            <span>{{ sprint.bugs }} / {{ sprint.crs }} / {{ sprint.stories }}</span>
+            <span>{{ sprint.loggedHours }}h</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="panel-kicker">Timesheet</span>
+            <h2>Developer gaps</h2>
+          </div>
+        </div>
+
+        <div class="gap-list">
+          <div class="gap-row" *ngFor="let gap of timesheetGaps" [class]="gap.status.toLowerCase()">
+            <div>
+              <strong>{{ gap.name }}</strong>
+              <span>{{ gap.status }}</span>
+            </div>
+            <p>{{ gap.logged }}h logged / {{ gap.expected }}h expected</p>
+            <meter min="0" [max]="gap.expected || 1" [value]="gap.logged"></meter>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel admin-preview">
+      <div class="panel-header compact">
+        <div>
+          <span class="panel-kicker">Easy maintenance</span>
+          <h2>Admin masters planned for phase one</h2>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <div *ngFor="let widget of widgets">
+          <strong>{{ widget.title }}</strong>
+          <span>{{ widget.description }}</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>

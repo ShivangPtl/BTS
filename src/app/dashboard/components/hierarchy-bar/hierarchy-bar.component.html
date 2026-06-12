@@ -1,0 +1,88 @@
+<div class="hierarchy-widget">
+
+  <!-- Toolbar -->
+  <div class="chart-toolbar">
+    <div class="crumb-area">
+      <button [disabled]="navigationHistory.length === 0" (click)="navigateBack()">← Back</button>
+      <ng-container *ngFor="let node of navigationHistory; let last = last">
+        <span class="crumb-sep">›</span>
+        <span [class.crumb-active]="last">{{ node.name }}</span>
+      </ng-container>
+      <span *ngIf="navigationHistory.length === 0" class="crumb-active">Organisation</span>
+    </div>
+    <span class="mode-pill">{{ navigationHistory.length === 0 ? 'Top view' : 'Drilldown — ' + navigationHistory[navigationHistory.length - 1].name }}</span>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-body" *ngIf="chartOptions">
+    <apx-chart
+      [series]="chartOptions.series"
+      [chart]="chartOptions.chart"
+      [colors]="chartOptions.colors"
+      [plotOptions]="chartOptions.plotOptions"
+      [dataLabels]="chartOptions.dataLabels"
+      [stroke]="chartOptions.stroke"
+      [xaxis]="chartOptions.xaxis"
+      [yaxis]="chartOptions.yaxis"
+      [legend]="chartOptions.legend"
+      [grid]="chartOptions.grid"
+      [tooltip]="chartOptions.tooltip"
+      [annotations]="chartOptions.annotations">
+    </apx-chart>
+  </div>
+
+  <!-- Entry list for focused person -->
+  <section class="entry-section" *ngIf="focusedRow">
+    <div class="entry-section-header">
+      <div class="focused-person">
+        <strong>{{ focusedRow.name }}</strong>
+        <span>{{ focusedRow.designation }}</span>
+      </div>
+      <div class="focused-stats">
+        <div>
+          <span>Own logged</span>
+          <strong>{{ focusedRow.ownLogged }}h</strong>
+        </div>
+        <div>
+          <span>Own budget</span>
+          <strong>{{ focusedRow.ownBudget }}h</strong>
+        </div>
+        <div *ngIf="focusedRow.teamBudget > 0">
+          <span>Team logged</span>
+          <strong>{{ focusedRow.teamLogged }}h</strong>
+        </div>
+        <div *ngIf="focusedRow.teamBudget > 0">
+          <span>Team budget</span>
+          <strong>{{ focusedRow.teamBudget }}h</strong>
+        </div>
+        <div>
+          <span>Utilization</span>
+          <strong [class.green]="focusedRow.utilization >= 90"
+                  [class.amber]="focusedRow.utilization >= 70 && focusedRow.utilization < 90"
+                  [class.red]="focusedRow.utilization < 70">
+            {{ focusedRow.utilization }}%
+          </strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="entry-list">
+      <div class="entry-row head">
+        <span>Date</span>
+        <span>Type</span>
+        <span>Issue</span>
+        <span>Hours</span>
+      </div>
+      <div class="entry-row" *ngFor="let entry of selectedEntries">
+        <span>{{ entry.spentOn }}</span>
+        <span><mark>{{ entry.issueType }}</mark></span>
+        <span>{{ entry.issueSubject }}</span>
+        <strong>{{ entry.hours }}h</strong>
+      </div>
+      <p class="empty-note" *ngIf="selectedEntries.length === 0">
+        No entries for {{ focusedRow.name }} in this range.
+      </p>
+    </div>
+  </section>
+
+</div>

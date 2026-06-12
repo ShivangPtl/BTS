@@ -1,11 +1,10 @@
 import { Component } from '@angular/core';
+import { DashboardComponent } from './dashboard/dashboard.component';
 
 @Component({
   selector: 'app-root',
-  imports: [],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  standalone: true,
+  imports: [DashboardComponent],
+  template: `<app-dashboard></app-dashboard>`
 })
-export class AppComponent {
-  title = 'bts-management-dashboard';
-}
+export class AppComponent {}

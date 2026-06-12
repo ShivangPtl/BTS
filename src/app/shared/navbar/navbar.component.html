@@ -1,0 +1,68 @@
+<header class="topnav">
+
+  <div class="topnav-top">
+    <div class="topnav-brand">
+      <div class="brand-mark">B</div>
+      <div class="brand-copy">
+        <strong>BTS Control</strong>
+        <span>Redmine cockpit</span>
+      </div>
+    </div>
+
+    <nav class="topnav-links" aria-label="Dashboard views">
+      <button
+        *ngFor="let item of navItems"
+        [class.active]="selectedView === item.key"
+        (click)="select(item.key)"
+        type="button">
+        {{ item.label }}
+      </button>
+    </nav>
+
+    <div class="topnav-user">
+      <div class="user-avatar">{{ loggedInUser | slice:0:2 | uppercase }}</div>
+      <div class="user-info">
+        <span>Logged in</span>
+        <strong>{{ loggedInUser }}</strong>
+      </div>
+      <button class="logout-btn" type="button">Logout</button>
+    </div>
+  </div>
+
+  <div class="topnav-filters">
+    <div class="filter-group">
+      <span class="filter-label">Project</span>
+      <select [(ngModel)]="selectedProjectId" (change)="filterChange.emit()">
+        <option value="all">All projects</option>
+        <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-sep"></div>
+
+    <div class="filter-group">
+      <span class="filter-label">From</span>
+      <input type="date" [(ngModel)]="startDate" (change)="filterChange.emit()">
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">To</span>
+      <input type="date" [(ngModel)]="endDate" (change)="filterChange.emit()">
+    </div>
+
+    <div class="filter-sep"></div>
+
+    <div class="filter-chip" *ngIf="selectedProjectId !== 'all'">
+      <span>{{ activeProjectLabel }}</span>
+      <button type="button" (click)="selectedProjectId = 'all'; filterChange.emit()">✕</button>
+    </div>
+
+    <div class="filter-spacer"></div>
+
+    <div class="filter-status">
+      <span class="status-dot"></span>
+      <span>{{ apiStatus }}</span>
+    </div>
+  </div>
+
+</header>
