@@ -1,6 +1,6 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, catchError, expand, map, of, reduce, takeWhile } from 'rxjs';
+import { Observable, catchError, lastValueFrom, of } from 'rxjs';
 import {
   CapacitySnapshot,
   PublicHoliday,
@@ -18,6 +18,12 @@ export class RedmineService {
   private readonly standardDailyHours = 8;
   private readonly apiBaseUrl = '/redmine-api';
   private readonly apiKeyStorageKey = '6d18a984feda82e9a2b028bbe1163f932ccc67a3';
+
+  // ── Cache ────────────────────────────────────────────────────────────────
+  private _allVersions: SprintSummary[] = [];
+  private _allIssues:   any[]           = [];
+  private _cacheLoaded  = false;
+  isLoading             = false;   // public so dashboard can show loader
 
   private readonly publicHolidays: PublicHoliday[] = [
     { date: '2026-06-11', name: 'Local Public Holiday', hoursDeducted: 8 },
@@ -137,83 +143,165 @@ export class RedmineService {
     }
   ];
 
-  private readonly projects: RedmineProject[] = [
-    { id: 1, name: 'BTS Internal System', identifier: 'bts-system', owner: 'Paresh Sir' },
-    { id: 2, name: 'Prompt Dairy Mobile', identifier: 'prompt-dairy-mobile', owner: 'Paresh Sir' },
-    { id: 3, name: 'HR Portal', identifier: 'hr-portal', owner: 'QA Lead Team' }
-  ];
+  private projects: RedmineProject[] = [];
 
-  private readonly sprints: SprintSummary[] = [
-    {
-      id: 1001,
-      projectId: 1,
-      name: 'BTS Sprint 24.06',
-      startDate: '2026-06-08',
-      endDate: '2026-06-12',
-      status: 'Active',
-      plannedHours: 96,
-      loggedHours: 78,
-      totalIssues: 34,
-      openIssues: 9,
-      bugs: 6,
-      crs: 4,
-      stories: 7
-    },
-    {
-      id: 1002,
-      projectId: 2,
-      name: 'Mobile App Sprint 18',
-      startDate: '2026-06-08',
-      endDate: '2026-06-12',
-      status: 'Active',
-      plannedHours: 80,
-      loggedHours: 64,
-      totalIssues: 29,
-      openIssues: 11,
-      bugs: 8,
-      crs: 3,
-      stories: 5
-    },
-    {
-      id: 1003,
-      projectId: 3,
-      name: 'HR Portal Stabilization',
-      startDate: '2026-06-08',
-      endDate: '2026-06-12',
-      status: 'Active',
-      plannedHours: 48,
-      loggedHours: 35,
-      totalIssues: 21,
-      openIssues: 6,
-      bugs: 7,
-      crs: 1,
-      stories: 3
+  // private readonly sprints: SprintSummary[] = [
+  //   {
+  //     id: 1001,
+  //     projectId: 1,
+  //     name: 'BTS Sprint 24.06',
+  //     startDate: '2026-06-08',
+  //     endDate: '2026-06-12',
+  //     status: 'Active',
+  //     plannedHours: 96,
+  //     loggedHours: 78,
+  //     totalIssues: 34,
+  //     openIssues: 9,
+  //     bugs: 6,
+  //     crs: 4,
+  //     stories: 7
+  //   },
+  //   {
+  //     id: 1002,
+  //     projectId: 2,
+  //     name: 'Mobile App Sprint 18',
+  //     startDate: '2026-06-08',
+  //     endDate: '2026-06-12',
+  //     status: 'Active',
+  //     plannedHours: 80,
+  //     loggedHours: 64,
+  //     totalIssues: 29,
+  //     openIssues: 11,
+  //     bugs: 8,
+  //     crs: 3,
+  //     stories: 5
+  //   },
+  //   {
+  //     id: 1003,
+  //     projectId: 3,
+  //     name: 'HR Portal Stabilization',
+  //     startDate: '2026-06-08',
+  //     endDate: '2026-06-12',
+  //     status: 'Active',
+  //     plannedHours: 48,
+  //     loggedHours: 35,
+  //     totalIssues: 21,
+  //     openIssues: 6,
+  //     bugs: 7,
+  //     crs: 1,
+  //     stories: 3
+  //   }
+  // ];
+
+  async loadAllData(): Promise<void> {
+
+    this.isLoading = true;
+
+    try {
+      // Run versions + issues + time entries in parallel
+      const [versionsResult, issuesResult] = await Promise.all([
+        this.fetchAllVersions(),
+        this.fetchAllIssues('all')
+      ]);
+
+      // Build sprint summaries from versions + issues (grouped in memory)
+      const versionMap = new Map<number, { version: any; projectId: number; projectName: string }>();
+      versionsResult.forEach(({ project, versions }) => {
+        versions.forEach((v: any) => {
+          versionMap.set(v.id, { version: v, projectId: project.id, projectName: project.name });
+        });
+      });
+
+      const issuesByVersion = new Map<number, any[]>();
+      issuesResult.forEach(issue => {
+        const vid = issue.fixed_version?.id;
+        if (!vid || !versionMap.has(vid)) return;
+        if (!issuesByVersion.has(vid)) issuesByVersion.set(vid, []);
+        issuesByVersion.get(vid)!.push(issue);
+      });
+
+      this._allVersions = [];
+      versionMap.forEach(({ version, projectId, projectName }, versionId) => {
+        const issues = issuesByVersion.get(versionId) ?? [];
+        this._allVersions.push(this.mapVersionToSprint(version, projectId, projectName, issues));
+      });
+
+      this._allIssues = issuesResult;
+      this._cacheLoaded = true;
+
+    } finally {
+      this.isLoading = false;
     }
-  ];
+  }
 
-  private readonly timeEntries: TimeEntry[] = [
-    // { id: 1, userId: 101, redmineUserId: 101, projectId: 1, sprintId: 1001, issueId: 4481, issueSubject: 'Team budget dashboard API', issueType: 'User Story', hours: 7.5, spentOn: '2026-06-08' },
-    // { id: 2, userId: 101, redmineUserId: 101, projectId: 1, sprintId: 1001, issueId: 4482, issueSubject: 'Hierarchy drilldown chart', issueType: 'Task', hours: 8, spentOn: '2026-06-09' },
-    // { id: 3, userId: 101, redmineUserId: 101, projectId: 2, sprintId: 1002, issueId: 5102, issueSubject: 'Milk collection sync issue', issueType: 'Bug', hours: 6.5, spentOn: '2026-06-10' },
-    // { id: 4, userId: 101, redmineUserId: 101, projectId: 1, sprintId: 1001, issueId: 4484, issueSubject: 'Holiday capacity formula', issueType: 'Task', hours: 5, spentOn: '2026-06-12' },
-    // { id: 5, userId: 102, redmineUserId: 102, projectId: 1, sprintId: 1001, issueId: 4491, issueSubject: 'Redmine import mapping', issueType: 'CR', hours: 8, spentOn: '2026-06-08' },
-    // { id: 6, userId: 102, redmineUserId: 102, projectId: 2, sprintId: 1002, issueId: 5103, issueSubject: 'Farmer payment report', issueType: 'User Story', hours: 7, spentOn: '2026-06-09' },
-    // { id: 7, userId: 102, redmineUserId: 102, projectId: 2, sprintId: 1002, issueId: 5105, issueSubject: 'Collection receipt print', issueType: 'Task', hours: 8, spentOn: '2026-06-10' },
-    // { id: 8, userId: 102, redmineUserId: 102, projectId: 1, sprintId: 1001, issueId: 4498, issueSubject: 'Timesheet missing report', issueType: 'Task', hours: 7.5, spentOn: '2026-06-12' },
-    // { id: 9, userId: 103, redmineUserId: 103, projectId: 1, sprintId: 1001, issueId: 4501, issueSubject: 'Sprint issue grouping', issueType: 'Task', hours: 4, spentOn: '2026-06-08' },
-    // { id: 10, userId: 103, redmineUserId: 103, projectId: 2, sprintId: 1002, issueId: 5111, issueSubject: 'Login token refresh defect', issueType: 'Bug', hours: 5.5, spentOn: '2026-06-10' },
-    // { id: 11, userId: 104, redmineUserId: 104, projectId: 3, sprintId: 1003, issueId: 6120, issueSubject: 'Payroll regression testing', issueType: 'Task', hours: 8, spentOn: '2026-06-08' },
-    // { id: 12, userId: 104, redmineUserId: 104, projectId: 3, sprintId: 1003, issueId: 6123, issueSubject: 'Attendance bug verification', issueType: 'Bug', hours: 7, spentOn: '2026-06-09' },
-    // { id: 13, userId: 104, redmineUserId: 104, projectId: 3, sprintId: 1003, issueId: 6124, issueSubject: 'Release sanity', issueType: 'Support', hours: 4, spentOn: '2026-06-12' },
-    // { id: 14, userId: 105, redmineUserId: 105, projectId: 3, sprintId: 1003, issueId: 6131, issueSubject: 'Leave workflow test cases', issueType: 'User Story', hours: 6, spentOn: '2026-06-08' },
-    // { id: 15, userId: 105, redmineUserId: 105, projectId: 1, sprintId: 1001, issueId: 4511, issueSubject: 'Dashboard QA review', issueType: 'Bug', hours: 5, spentOn: '2026-06-12' },
-    // { id: 16, userId: 201, redmineUserId: 201, projectId: 1, sprintId: 1001, issueId: 4511, issueSubject: 'Farmer payment report', issueType: 'Bug', hours: 5, spentOn: '2026-06-12' },
-    // { id: 17, userId: 20, redmineUserId: 20, projectId: 1, sprintId: 1001, issueId: 4520, issueSubject: 'Sprint planning and review', issueType: 'Meeting', hours: 6, spentOn: '2026-06-08' },
-    // { id: 18, userId: 30, redmineUserId: 30, projectId: 3, sprintId: 1003, issueId: 6139, issueSubject: 'QA release coordination', issueType: 'Meeting', hours: 4, spentOn: '2026-06-10' }
-  ];
+  // Fetch all project versions in parallel
+  private async fetchAllVersions(): Promise<{ project: RedmineProject; versions: any[] }[]> {
+    return Promise.all(
+      this.projects.map(async project => {
+        try {
+          const res = await lastValueFrom(
+            this.http.get<{ versions: any[] }>(
+              `${this.apiBaseUrl}/projects/${project.id}/versions.json`,
+              { headers: this.getHeaders() }
+            )
+          );
+          return { project, versions: res.versions ?? [] };
+        } catch {
+          return { project, versions: [] };
+        }
+      })
+    );
+  }
+
+  // Fetch ALL time entries (no date filter — full history)
+  private async fetchAllTimeEntries(): Promise<TimeEntry[]> {
+    const PAGE = 100;
+    const result: TimeEntry[] = [];
+    let offset = 0;
+    let total = Infinity;
+
+    while (offset < total) {
+      const res = await lastValueFrom(
+        this.http.get<{ time_entries: any[]; total_count: number }>(
+          `${this.apiBaseUrl}/time_entries.json`,
+          {
+            headers: this.getHeaders(),
+            params: { limit: PAGE.toString(), offset: offset.toString() }
+          }
+        )
+      );
+
+      result.push(...(res.time_entries ?? []).map((e: any) => ({
+        id: e.id,
+        userId: e.user.id,
+        userName: e.user.name,
+        redmineUserId: e.user.id,
+        projectId: e.project.id,
+        sprintId: e.fixed_version?.id ?? 0,
+        issueId: e.issue?.id ?? 0,
+        issueSubject: e.comments ?? '',
+        issueType: e.activity?.name ?? 'Task',
+        hours: e.hours,
+        spentOn: e.spent_on
+      })));
+
+      total = res.total_count;
+      offset += PAGE;
+      if (result.length >= 5000) break;  // safety cap
+    }
+
+    return result;
+  }
 
   getHierarchy(): Observable<UserNode[]> {
-    return of(this.hierarchyData);
+    const headers = this.getHeaders();
+
+    return this.http.get<UserNode[]>('/bts-api/api/hierarchy', { headers }).pipe(
+      catchError(err => {
+        console.warn('Hierarchy API failed, using mock', err);
+        return of(this.hierarchyData);
+      })
+    );
   }
 
   constructor(private http: HttpClient) {}
@@ -237,32 +325,182 @@ export class RedmineService {
     return Boolean(this.getApiKey());
   }
 
-  getProjects(): Observable<{ projects: RedmineProject[] }> {
-    if (!this.hasApiKey()) {
-      return of({ projects: this.projects });
-    }
+  async getProjects(): Promise<{ projects: RedmineProject[] }> {
 
-    return this.http.get<{ projects: RedmineProject[] }>(
-      `${this.apiBaseUrl}/projects.json`,
-      { headers: this.getHeaders() }
-    ).pipe(
-      map(response => ({
-        projects: response.projects.map(project => ({
-          id: project.id,
-          name: project.name,
-          identifier: project.identifier,
-          owner: 'Redmine'
-        }))
-      })),
-      catchError(error => {
-        console.warn('Redmine projects API failed. Falling back to mock projects.', error);
-        return of({ projects: this.projects });
-      })
-    );
+    try {
+      const response = await lastValueFrom(
+        this.http.get<{ projects: any[] }>(
+          `${this.apiBaseUrl}/projects.json`,
+          { headers: this.getHeaders() }
+        )
+      );
+
+      const projects = response.projects.map(project => ({
+        id: project.id,
+        name: project.name,
+        identifier: project.identifier,
+        owner: 'Redmine'
+      }));
+
+      this.projects = projects;
+      return { projects };
+
+    } catch (error) {
+      console.warn('Redmine projects API failed. Falling back to mock projects.', error);
+      return { projects: this.projects };
+    }
   }
 
-  getSprints(projectId = 'all'): Observable<SprintSummary[]> {
-    return of(this.filterByProject(this.sprints, projectId));
+  // getSprints(projectId = 'all'): Observable<SprintSummary[]> {
+  //   return of(this.filterByProject(this.sprints, projectId));
+  // }
+
+  // async getSprints(projectId = 'all'): Promise<SprintSummary[]> {
+
+  //   try {
+  //     const projectsToFetch = projectId === 'all'
+  //       ? this.projects
+  //       : [{ id: Number(projectId), name: '', identifier: '', owner: '' }];
+
+  //     if (!projectsToFetch.length) return [];
+
+  //     // Fetch versions for all projects in parallel
+  //     const versionResults = await Promise.all(
+  //       projectsToFetch.map(async project => {
+  //         try {
+  //           const res = await lastValueFrom(
+  //             this.http.get<{ versions: any[] }>(
+  //               `${this.apiBaseUrl}/projects/${project.id}/versions.json`,
+  //               { headers: this.getHeaders() }
+  //             )
+  //           );
+  //           return { project, versions: res.versions ?? [] };
+  //         } catch {
+  //           return { project, versions: [] };
+  //         }
+  //       })
+  //     );
+
+  //     // Flatten all versions
+  //     const allVersions = versionResults.flatMap(({ project, versions }) =>
+  //       versions.map(v => ({ projectId: project.id, projectName: project.name, version: v }))
+  //     );
+
+  //     if (!allVersions.length) return [];
+
+  //     // Fetch issues for all versions in parallel
+  //     const sprints = await Promise.all(
+  //       allVersions.map(async ({ projectId, projectName, version }) => {
+  //         try {
+  //           const res = await lastValueFrom(
+  //             this.http.get<{ issues: any[] }>(
+  //               `${this.apiBaseUrl}/issues.json`,
+  //               {
+  //                 headers: this.getHeaders(),
+  //                 params: {
+  //                   project_id: projectId,
+  //                   fixed_version_id: version.id,
+  //                   limit: '100',
+  //                   status_id: '*'
+  //                 }
+  //               }
+  //             )
+  //           );
+  //           return this.mapVersionToSprint(version, projectId, projectName, res.issues ?? []);
+  //         } catch {
+  //           return this.mapVersionToSprint(version, projectId, projectName, []);
+  //         }
+  //       })
+  //     );
+
+  //     return sprints;
+
+  //   } catch (err) {
+  //     console.error('Sprints API failed, using mock', err);
+  //     return [];
+  //   }
+  // }
+
+  getSprints(projectId = 'all'): SprintSummary[] {
+
+    return projectId === 'all'
+      ? this._allVersions
+      : this._allVersions.filter(s => s.projectId === Number(projectId));
+  }
+
+  // Single paginated fetch for all issues — max 2-3 calls total
+  private async fetchAllIssues(projectId = 'all'): Promise<any[]> {
+    const PAGE = 100;
+    const allIssues: any[] = [];
+
+    let offset = 0;
+    let total = Infinity;
+
+    while (offset < total) {
+      const params: any = {
+        limit: PAGE.toString(),
+        offset: offset.toString(),
+        status_id: '*'
+      };
+
+      if (projectId !== 'all') {
+        params['project_id'] = projectId;
+      }
+
+      const res = await lastValueFrom(
+        this.http.get<{ issues: any[]; total_count: number }>(
+          `${this.apiBaseUrl}/issues.json`,
+          { headers: this.getHeaders(), params }
+        )
+      );
+
+      allIssues.push(...(res.issues ?? []));
+      total = res.total_count;
+      offset += PAGE;
+
+      // safety cap — don't fetch more than 1000 issues
+      if (allIssues.length >= 1000) break;
+    }
+
+    return allIssues;
+  }
+
+  private mapVersionToSprint(
+    version: any,
+    projectId: number,
+    projectName: string,
+    issues: any[]
+  ): SprintSummary {
+    const openIssues = issues.filter(i => !['Closed', 'Resolved', 'Rejected'].includes(i.status?.name)).length;
+    const bugs = issues.filter(i => i.tracker?.name === 'Bug').length;
+    const crs = issues.filter(i => ['CR', 'Change Request'].includes(i.tracker?.name)).length;
+    const stories = issues.filter(i => ['User Story', 'Feature'].includes(i.tracker?.name)).length;
+    const loggedHours = issues.reduce((s, i) => s + (i.spent_hours ?? 0), 0);
+    const plannedHours = issues.reduce((s, i) => s + (i.estimated_hours ?? 0), 0);
+
+    // Map Redmine version status to our status
+    const statusMap: Record<string, 'Planned' | 'Active' | 'Closed'> = {
+      open: 'Active',
+      locked: 'Closed',
+      closed: 'Closed'
+    };
+
+    return {
+      id: version.id,
+      versionId: version.id,
+      projectId,
+      name: version.name,
+      startDate: version.created_on?.slice(0, 10) ?? '',
+      endDate: version.due_date ?? '',
+      status: statusMap[version.status] ?? 'Planned',
+      plannedHours,
+      loggedHours: Math.round(loggedHours * 10) / 10,
+      totalIssues: issues.length,
+      openIssues,
+      bugs,
+      crs,
+      stories
+    };
   }
 
   getPublicHolidays(): Observable<PublicHoliday[]> {
@@ -278,78 +516,135 @@ export class RedmineService {
     ]);
   }
 
-  getSpentTime(startDate: string, endDate: string, projectId = 'all'): Observable<TimeEntry[]> {
-    if (!this.hasApiKey()) {
-      // mock path remains identical
-      const start = this.toDate(startDate);
-      const end = this.toDate(endDate);
-      return of(
-        this.timeEntries.filter(entry => {
-          const spentOn = this.toDate(entry.spentOn);
-          const matchesDate = spentOn >= start && spentOn <= end;
-          const matchesProject = projectId === 'all' || entry.projectId === Number(projectId);
-          return matchesDate && matchesProject;
-        })
-      );
-    }
+  // getSpentTime(startDate: string, endDate: string, projectId = 'all'): Observable<TimeEntry[]> {
+  //   const PAGE_LIMIT = 100;
 
-    const PAGE_LIMIT = 100;
+  //   // 1. Build base query parameters
+  //   let queryParams = new HttpParams()
+  //     .set('spent_on', `><${startDate}|${endDate}`)
+  //     .set('limit', PAGE_LIMIT.toString());
 
-    // 1. Build base query parameters
-    let queryParams = new HttpParams()
-      .set('spent_on', `><${startDate}|${endDate}`)
-      .set('limit', PAGE_LIMIT.toString());
+  //   if (projectId !== 'all') {
+  //     queryParams = queryParams.set('project_id', projectId);
+  //   }
 
-    if (projectId !== 'all') {
-      queryParams = queryParams.set('project_id', projectId);
-    }
+  //   // Helper to execute a single page HTTP request
+  //   const fetchPage = (offset: number) => {
+  //     const paramsWithOffset = queryParams.set('offset', offset.toString());
+  //     return this.http.get<{ time_entries: any[]; total_count: number }>(
+  //       `${this.apiBaseUrl}/time_entries.json`,
+  //       { headers: this.getHeaders(), params: paramsWithOffset }
+  //     );
+  //   };
 
-    // Helper to execute a single page HTTP request
-    const fetchPage = (offset: number) => {
-      const paramsWithOffset = queryParams.set('offset', offset.toString());
-      return this.http.get<{ time_entries: any[]; total_count: number }>(
-        `${this.apiBaseUrl}/time_entries.json`,
-        { headers: this.getHeaders(), params: paramsWithOffset }
-      );
-    };
+  //   // 2. Multi-page pagination stream using RxJS expand
+  //   return fetchPage(0).pipe(
+  //     expand((res, index) => {
+  //       const nextOffset = (index + 1) * PAGE_LIMIT;
+  //       // If the current offset + items fetched is less than total_count, fetch next page
+  //       if (nextOffset < res.total_count) {
+  //         return fetchPage(nextOffset);
+  //       }
+  //       // Otherwise, complete the pagination stream
+  //       return of(null);
+  //     }),
+  //     // Stop the stream when expand returns of(null)
+  //     takeWhile((res): res is NonNullable<typeof res> => res !== null),
+  //     // Map individual API entries to your frontend model format per page
+  //     map(res => {
+  //       return res.time_entries.map(e => ({
+  //         id: e.id,
+  //         userId: e.user.id,
+  //         userName: e.user.name,
+  //         redmineUserId: e.user.id,
+  //         projectId: e.project.id,
+  //         sprintId: 0,
+  //         issueId: e.issue?.id ?? 0,
+  //         issueSubject: e.comments ?? '',
+  //         issueType: e.activity?.name ?? 'Task',
+  //         hours: e.hours,
+  //         spentOn: e.spent_on
+  //       }));
+  //     }),
+  //     // Combine arrays from all pages back into a single flat array
+  //     reduce((accumulator, currentBatch) => accumulator.concat(currentBatch), [] as TimeEntry[]),
+  //     catchError(error => {
+  //       console.warn('Redmine time entries API failed. Falling back to mock.', error);
+  //       return of([]);
+  //     })
+  //   );
+  // }
+  async getSpentTime(
+    startDate: string,
+    endDate: string,
+    projectId = 'all'
+  ): Promise<TimeEntry[]> {
+    // return from cache if already fetched
 
-    // 2. Multi-page pagination stream using RxJS expand
-    return fetchPage(0).pipe(
-      expand((res, index) => {
-        const nextOffset = (index + 1) * PAGE_LIMIT;
-        // If the current offset + items fetched is less than total_count, fetch next page
-        if (nextOffset < res.total_count) {
-          return fetchPage(nextOffset);
+    this.isLoading = true;
+
+    try {
+      const PAGE = 100;
+      const result: TimeEntry[] = [];
+      let offset = 0;
+      let total = Infinity;
+
+      while (offset < total) {
+        const params: any = {
+          limit: PAGE.toString(),
+          offset: offset.toString(),
+          spent_on: `><${startDate}|${endDate}`
+        };
+
+        if (projectId !== 'all') {
+          params['project_id'] = projectId;
         }
-        // Otherwise, complete the pagination stream
-        return of(null);
-      }),
-      // Stop the stream when expand returns of(null)
-      takeWhile((res): res is NonNullable<typeof res> => res !== null),
-      // Map individual API entries to your frontend model format per page
-      map(res => {
-        return res.time_entries.map(e => ({
+
+        const res = await lastValueFrom(
+          this.http.get<{ time_entries: any[]; total_count: number }>(
+            `${this.apiBaseUrl}/time_entries.json`,
+            { headers: this.getHeaders(), params }
+          )
+        );
+
+        result.push(...(res.time_entries ?? []).map((e: any) => ({
           id: e.id,
           userId: e.user.id,
           userName: e.user.name,
           redmineUserId: e.user.id,
           projectId: e.project.id,
-          sprintId: 0,
+          sprintId: e.fixed_version?.id ?? 0,
           issueId: e.issue?.id ?? 0,
           issueSubject: e.comments ?? '',
           issueType: e.activity?.name ?? 'Task',
           hours: e.hours,
           spentOn: e.spent_on
-        }));
-      }),
-      // Combine arrays from all pages back into a single flat array
-      reduce((accumulator, currentBatch) => accumulator.concat(currentBatch), [] as TimeEntry[]),
-      catchError(error => {
-        console.warn('Redmine time entries API failed. Falling back to mock.', error);
-        return of(this.timeEntries);
-      })
-    );
+        })));
+
+        total = res.total_count;
+        offset += PAGE;
+
+        if (result.length >= 2000) break;  // safety cap per range
+      }
+      return result;
+
+    } catch (err) {
+      console.warn('Time entries fetch failed', err);
+      return [];
+    } finally {
+      this.isLoading = false;
+    }
   }
+
+
+  // getSpentTime(startDate: string, endDate: string, projectId = 'all'): TimeEntry[] {
+  //   const entries = this._cacheLoaded ? this._allEntries : this.timeEntries;
+  //   return entries.filter(e => {
+  //     const matchDate = e.spentOn >= startDate && e.spentOn <= endDate;
+  //     const matchProject = projectId === 'all' || e.projectId === Number(projectId);
+  //     return matchDate && matchProject;
+  //   });
+  // }
 
   calculateCapacity(startDate: string, endDate: string, hierarchy: UserNode[], entries: TimeEntry[]): CapacitySnapshot {
     const weekdays = this.countWeekdays(startDate, endDate);

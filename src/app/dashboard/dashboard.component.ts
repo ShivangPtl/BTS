@@ -1,10 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { NgApexchartsModule } from 'ng-apexcharts';
+import { lastValueFrom } from 'rxjs';
+import { AppUserSession, AuthService } from '../core/services/auth.service';
+import { HierarchyAccessService } from '../core/services/hierarchy-access.service';
 import { RedmineService } from '../core/services/redmine.service';
 import { AppView, NavbarComponent } from '../shared/navbar/navbar.component';
 import { HierarchyBarComponent } from './components/hierarchy-bar/hierarchy-bar.component';
+import { OverviewComponent } from "./components/overview/overview.component";
 import {
   CapacitySnapshot,
   IssueType,
@@ -42,7 +47,7 @@ interface TimesheetGap {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgApexchartsModule, HierarchyBarComponent, NavbarComponent],
+  imports: [CommonModule, FormsModule, NgApexchartsModule, HierarchyBarComponent, NavbarComponent, OverviewComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -57,10 +62,8 @@ export class DashboardComponent implements OnInit {
   startDate = '2026-06-08';
   endDate = '2026-06-09';
   selectedProjectId = 'all';
-  selectedView: AppView = 'hierarchy';
+  selectedView: AppView = 'overview';
   sidebarCollapsed = false;
-  readonly loggedInUser = 'Shivang Patel';
-  redmineApiKey = '';
   apiStatus: 'Mock data' | 'Connected' = 'Mock data';
 
   capacity: CapacitySnapshot = {
@@ -79,51 +82,96 @@ export class DashboardComponent implements OnInit {
   issueChartOptions: any;
   dateTrendOptions: any;
 
-  constructor(private redmineService: RedmineService) {}
+  session: AppUserSession | null = null;
+  visibleHierarchy: UserNode[] = [];
+  visibleTimeEntries: TimeEntry[] = [];
+
+  constructor(
+    private redmineService: RedmineService,
+    private authService: AuthService,
+    private hierarchyAccess: HierarchyAccessService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
-    this.redmineService.setApiKey('6d18a984feda82e9a2b028bbe1163f932ccc67a3');
-    this.redmineApiKey = this.redmineService.getApiKey();
-    this.apiStatus = this.redmineService.hasApiKey() ? 'Connected' : 'Mock data';
+    const session = this.authService.session;
+
+    if (!session) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.session = session;
+    this.redmineService.setApiKey(session.apiKey);
+    this.apiStatus = 'Connected';
     this.loadDashboardData();
   }
 
-  loadDashboardData(): void {
-    this.redmineService.getProjects().subscribe(res => {
-      this.projects = res.projects;
-      this.refreshDerivedData();
-    });
+  private applyAccessFilter(): void {
+    if (!this.session) return;
 
-    this.redmineService.getHierarchy().subscribe(data => {
-      this.hierarchy = data;
-      this.refreshDerivedData();
-    });
+    this.visibleHierarchy = this.hierarchyAccess.getVisibleHierarchy(
+      this.hierarchy,
+      this.session,
+      this.timeEntries
+    );
 
-    this.redmineService.getPublicHolidays().subscribe(data => {
-      this.holidays = data;
-      this.refreshDerivedData();
-    });
+    this.visibleTimeEntries = this.hierarchyAccess.getVisibleTimeEntries(
+      this.timeEntries,
+      this.visibleHierarchy
+    );
+  }
 
-    this.redmineService.getWidgetCatalog().subscribe(data => {
-      this.widgets = data;
-    });
+  onViewChange(view: AppView): void {
+    this.selectedView = view;
+  }
+
+  isLoading = false;
+
+  async loadDashboardData(): Promise<void> {
+    this.isLoading = true;
+
+    const res = await this.redmineService.getProjects();
+    this.projects = res.projects;
+
+    // load hierarchy and holidays in parallel with the big data load
+    const [hierarchy, holidays] = await Promise.all([
+      lastValueFrom(this.redmineService.getHierarchy()),
+      lastValueFrom(this.redmineService.getPublicHolidays()),
+      this.redmineService.loadAllData()   // versions + issues + entries cached here
+    ]);
+
+    this.hierarchy = hierarchy;
+    this.holidays = holidays;
+    this.isLoading = false;
 
     this.fetchFilteredData();
   }
 
-  fetchFilteredData(): void {
-    this.redmineService.getSprints(this.selectedProjectId).subscribe(data => {
-      this.sprints = data;
-      this.refreshDerivedData();
-    });
+  // fetchFilteredData(): void {
+  //   this.sprints = this.redmineService.getSprints(this.selectedProjectId);
+  //   this.timeEntries = this.redmineService.getSpentTime(this.startDate, this.endDate, this.selectedProjectId);
+  //   this.refreshDerivedData();
+  // }
 
-    this.redmineService.getSpentTime(this.startDate, this.endDate, this.selectedProjectId).subscribe(entries => {
-      this.timeEntries = entries;
-      this.refreshDerivedData();
-    });
+  async fetchFilteredData(): Promise<void> {
+    // sprints — instant from cache
+    this.sprints = this.redmineService.getSprints(this.selectedProjectId);
+
+    // time entries — fetched by date range, cached after first fetch
+    this.isLoading = true;
+    this.timeEntries = await this.redmineService.getSpentTime(
+      this.startDate,
+      this.endDate,
+      this.selectedProjectId
+    );
+    this.isLoading = false;
+
+    this.refreshDerivedData();
   }
 
   refreshDerivedData(): void {
+    this.applyAccessFilter();
     this.capacity = this.redmineService.calculateCapacity(this.startDate, this.endDate, this.hierarchy, this.timeEntries);
     this.kpiCards = this.buildKpis();
     this.projectRollups = this.buildProjectRollups();
@@ -140,7 +188,7 @@ export class DashboardComponent implements OnInit {
   }
 
   connectRedmine(): void {
-    this.redmineService.setApiKey(this.redmineApiKey);
+    this.redmineService.setApiKey(this.session!.apiKey);
     this.apiStatus = this.redmineService.hasApiKey() ? 'Connected' : 'Mock data';
     this.loadDashboardData();
   }

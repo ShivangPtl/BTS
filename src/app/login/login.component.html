@@ -1,0 +1,56 @@
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="login-brand">
+      <div class="brand-mark">B</div>
+      <div>
+        <strong>BTS Control</strong>
+        <span>Redmine Dashboard</span>
+      </div>
+    </div>
+
+    <h1>Sign in</h1>
+    <p class="login-sub">Enter your Redmine API key to continue</p>
+
+    <div class="error-banner" *ngIf="error">
+      <span>⚠</span> {{ error }}
+    </div>
+
+    <div class="field">
+      <label for="apiKey">Redmine API Key</label>
+      <input
+        id="apiKey"
+        type="password"
+        [(ngModel)]="apiKey"
+        placeholder="Paste your API key here"
+        (keyup.enter)="onSubmit()"
+        [disabled]="loading"
+        autocomplete="off"
+        spellcheck="false">
+      <p class="field-hint">
+        Find it in Redmine → My account → API access key
+      </p>
+    </div>
+
+    <button class="login-btn" (click)="onSubmit()" [disabled]="loading">
+      <span *ngIf="!loading">Sign in →</span>
+      <span *ngIf="loading" class="spinner"></span>
+    </button>
+
+    <div class="login-help">
+      <a href="https://bts.promptdairytech.com/my/account" target="_blank" rel="noopener">
+        Get your API key from Redmine ↗
+      </a>
+    </div>
+
+  </div>
+
+  <div class="login-visual">
+    <div class="visual-content">
+      <div class="stat-pill">📊 Hierarchy View</div>
+      <div class="stat-pill">⏱ Spent Time</div>
+      <div class="stat-pill">📅 Holiday Budget</div>
+      <div class="stat-pill">🔐 Role-based Access</div>
+    </div>
+  </div>
+</div>

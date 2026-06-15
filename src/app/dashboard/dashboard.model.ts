@@ -21,6 +21,7 @@ export interface RedmineProject {
 
 export interface SprintSummary {
   id: number;
+  versionId: any;
   projectId: number;
   name: string;
   startDate: string;
@@ -69,4 +70,20 @@ export interface WidgetDefinition {
   title: string;
   description: string;
   enabled: boolean;
+}
+
+export interface OverviewSummary {
+  totalMembers: number;
+  activeMembersToday: number;
+  totalProjects: number;
+  activeSprintsCount: number;
+  totalOpenIssues: number;
+  totalBugs: number;
+  totalCRs: number;
+  totalStories: number;
+  overallUtilization: number;    // % logged vs budget this week
+  weekLoggedHours: number;
+  weekBudgetHours: number;
+  sprintHealthAvg: number;       // avg % complete across active sprints
+  teamAtRisk: { name: string; utilization: number }[];  // under 50%
 }

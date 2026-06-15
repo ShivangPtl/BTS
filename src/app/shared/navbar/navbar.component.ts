@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { AppUserSession, AuthService } from '../../core/services/auth.service';
 import { RedmineProject } from '../../dashboard/dashboard.model';
 
-export type AppView = 'hierarchy' | 'projects' | 'sprints' | 'admin';
+export type AppView = 'overview' | 'utilization' | 'sprints' | 'issues' | 'admin';
 
 @Component({
   selector: 'app-navbar',
@@ -13,8 +15,8 @@ export type AppView = 'hierarchy' | 'projects' | 'sprints' | 'admin';
   styleUrls: ['./navbar.component.css']
 })
 export class NavbarComponent {
-  @Input() selectedView: AppView = 'hierarchy';
-  @Input() loggedInUser = '';
+  @Input() selectedView: AppView = 'overview';
+  @Input() session: AppUserSession | null = null;
   @Input() projects: RedmineProject[] = [];
   @Input() apiStatus: 'Mock data' | 'Connected' = 'Mock data';
 
@@ -30,11 +32,18 @@ export class NavbarComponent {
   @Output() selectedViewChange = new EventEmitter<AppView>();
   @Output() filterChange = new EventEmitter<void>();
 
+
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) {}
+
   navItems: { key: AppView; label: string }[] = [
-    { key: 'hierarchy', label: 'Hierarchy'     },
-    { key: 'projects',  label: 'Projects'      },
-    { key: 'sprints',   label: 'Sprint Health' },
-    { key: 'admin',     label: 'Admin Masters' },
+    { key: 'overview', label: 'Overview' },
+    { key: 'utilization', label: 'Utilization' },
+    { key: 'sprints', label: 'Sprints' },
+    { key: 'issues', label: 'Issues' },
+    { key: 'admin', label: 'Admin' },
   ];
 
   get activeProjectLabel(): string {
@@ -44,4 +53,10 @@ export class NavbarComponent {
   select(view: AppView): void {
     this.selectedViewChange.emit(view);
   }
+
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
+
 }

@@ -1,0 +1,148 @@
+<div class="overview" *ngIf="summary">
+
+  <!-- ── KPI Strip ── -->
+  <section class="kpi-strip">
+
+    <div class="kpi-card blue">
+      <span class="kpi-label">Overall Utilization</span>
+      <strong class="kpi-value">{{ summary.overallUtilization }}%</strong>
+      <span class="kpi-sub">{{ summary.weekLoggedHours }}h of {{ summary.weekBudgetHours }}h logged</span>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Team Members</span>
+      <strong class="kpi-value">{{ summary.totalMembers }}</strong>
+      <span class="kpi-sub">{{ summary.activeMembersToday }} active this week</span>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Active Sprints</span>
+      <strong class="kpi-value">{{ summary.activeSprintsCount }}</strong>
+      <span class="kpi-sub">{{ summary.sprintHealthAvg }}% avg complete</span>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Projects</span>
+      <strong class="kpi-value">{{ summary.totalProjects }}</strong>
+      <span class="kpi-sub">across organisation</span>
+    </div>
+
+    <div class="kpi-card red">
+      <span class="kpi-label">Open Bugs</span>
+      <strong class="kpi-value">{{ summary.totalBugs }}</strong>
+      <span class="kpi-sub">across all projects</span>
+    </div>
+
+    <div class="kpi-card amber">
+      <span class="kpi-label">Open CRs</span>
+      <strong class="kpi-value">{{ summary.totalCRs }}</strong>
+      <span class="kpi-sub">change requests</span>
+    </div>
+
+  </section>
+
+  <!-- ── Main grid ── -->
+  <div class="overview-grid">
+
+    <!-- Active Sprints -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Active Sprints</h2>
+        <span class="badge blue">{{ summary.activeSprintsCount }}</span>
+      </div>
+      <div class="sprint-list">
+        <div class="sprint-row" *ngFor="let s of activeSprintList">
+          <div class="sprint-meta">
+            <strong>{{ s.name }}</strong>
+            <span>{{ s.startDate }} → {{ s.endDate }}</span>
+          </div>
+          <div class="sprint-right">
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="sprintPct(s)"></div>
+            </div>
+            <span class="sprint-pct">{{ sprintPct(s) }}%</span>
+            <span class="sprint-issues">{{ s.openIssues }} open</span>
+          </div>
+        </div>
+        <p class="empty-note" *ngIf="activeSprintList.length === 0">No active sprints</p>
+      </div>
+    </section>
+
+    <!-- Issue Breakdown -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Issue Breakdown</h2>
+        <span class="badge">All sprints</span>
+      </div>
+      <div class="issue-breakdown">
+        <div class="issue-type-row" *ngFor="let t of issueTypeBreakdown">
+          <div class="issue-dot" [style.background]="t.color"></div>
+          <span class="issue-label">{{ t.label }}</span>
+          <div class="issue-bar-wrap">
+            <div class="issue-bar"
+                 [style.background]="t.color + '22'"
+                 [style.border-color]="t.color + '44'">
+              <div class="issue-bar-fill"
+                   [style.background]="t.color"
+                   [style.width.%]="(t.count / (summary.totalOpenIssues || 1)) * 100">
+              </div>
+            </div>
+          </div>
+          <strong class="issue-count">{{ t.count }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team At Risk -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Team at Risk</h2>
+        <span class="badge red">Low utilization</span>
+      </div>
+      <div class="risk-list">
+        <div class="risk-row" *ngFor="let m of summary.teamAtRisk">
+          <div class="risk-avatar">{{ m.name | slice:0:2 | uppercase }}</div>
+          <div class="risk-info">
+            <strong>{{ m.name }}</strong>
+            <div class="risk-bar-wrap">
+              <div class="risk-bar">
+                <div class="risk-fill"
+                     [style.width.%]="m.utilization"
+                     [class]="utilizationColor(m.utilization)">
+                </div>
+              </div>
+              <span>{{ m.utilization }}%</span>
+            </div>
+          </div>
+        </div>
+        <p class="empty-note green-note" *ngIf="summary.teamAtRisk.length === 0">
+          ✓ All team members are on track
+        </p>
+      </div>
+    </section>
+
+    <!-- Upcoming Holidays -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Upcoming Holidays</h2>
+        <span class="badge">Next 30 days</span>
+      </div>
+      <div class="holiday-list">
+        <div class="holiday-row" *ngFor="let h of upcomingHolidays">
+          <div class="holiday-date">
+            <strong>{{ h.date | date:'dd' }}</strong>
+            <span>{{ h.date | date:'MMM' }}</span>
+          </div>
+          <div class="holiday-info">
+            <strong>{{ h.name }}</strong>
+            <span>{{ h.hoursDeducted }}h deducted</span>
+          </div>
+        </div>
+        <p class="empty-note" *ngIf="upcomingHolidays.length === 0">
+          No holidays in next 30 days
+        </p>
+      </div>
+    </section>
+
+  </div>
+</div>
