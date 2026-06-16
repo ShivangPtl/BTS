@@ -59,8 +59,15 @@ export class DashboardComponent implements OnInit {
   holidays: PublicHoliday[] = [];
   widgets: WidgetDefinition[] = [];
 
-  startDate = '2026-06-08';
-  endDate = '2026-06-09';
+  private today = new Date();
+
+  startDate: string = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.toLocaleDateString('en-CA'); // yyyy-MM-dd
+  })();
+
+  endDate: string = new Date().toLocaleDateString('en-CA');
   selectedProjectId = 'all';
   selectedView: AppView = 'overview';
   sidebarCollapsed = false;
@@ -91,7 +98,19 @@ export class DashboardComponent implements OnInit {
     private authService: AuthService,
     private hierarchyAccess: HierarchyAccessService,
     private router: Router
-  ) {}
+  ) {
+
+    // const today = new Date();
+
+    // const monday = new Date(today);
+    // const daysSinceMonday = (today.getDay() + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+    // monday.setDate(today.getDate() - daysSinceMonday);
+
+    // const startDate = monday.toISOString().split('T')[0];
+    // const endDate = today.toISOString().split('T')[0];
+
+    // console.log(startDate, endDate);
+  }
 
   ngOnInit(): void {
     const session = this.authService.session;
@@ -155,10 +174,10 @@ export class DashboardComponent implements OnInit {
   // }
 
   async fetchFilteredData(): Promise<void> {
-    // sprints — instant from cache
-    this.sprints = this.redmineService.getSprints(this.selectedProjectId);
+    // Active sprints only — instant from cache, no closed/planned noise
+    this.sprints = this.redmineService.getActiveSprints(this.selectedProjectId);
 
-    // time entries — fetched by date range, cached after first fetch
+    // time entries — fetched by date range, scoped to active sprint date window
     this.isLoading = true;
     this.timeEntries = await this.redmineService.getSpentTime(
       this.startDate,

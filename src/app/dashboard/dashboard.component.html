@@ -18,10 +18,9 @@
       <app-overview
         [projects]="projects"
         [sprints]="sprints"
-        [timeEntries]="visibleTimeEntries"
         [hierarchy]="visibleHierarchy"
         [holidays]="holidays"
-        [workingDays]="capacity.workingDays">
+        (navigateToSprints)="onViewChange('sprints')">
       </app-overview>
     }
 

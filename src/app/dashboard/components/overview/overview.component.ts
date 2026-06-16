@@ -1,9 +1,17 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import {
-  OverviewSummary, PublicHoliday, RedmineProject,
-  SprintSummary, TimeEntry, UserNode
+  PublicHoliday, RedmineProject,
+  SprintSummary, UserNode
 } from '../../dashboard.model';
+
+interface ProjectHealth {
+  project: RedmineProject;
+  activeCount: number;
+  openIssues: number;
+  overdueSprints: number;
+  closingSoon: number;
+}
 
 @Component({
   selector: 'app-overview',
@@ -14,116 +22,114 @@ import {
 })
 export class OverviewComponent implements OnChanges {
   @Input() projects: RedmineProject[] = [];
-  @Input() sprints: SprintSummary[] = [];
-  @Input() timeEntries: TimeEntry[] = [];
+  @Input() sprints: SprintSummary[] = [];   // active sprints only, from version metadata
   @Input() hierarchy: UserNode[] = [];
   @Input() holidays: PublicHoliday[] = [];
-  @Input() workingDays = 0;
 
-  summary!: OverviewSummary;
-  activeSprintList: SprintSummary[] = [];
+  @Output() navigateToSprints = new EventEmitter<void>();
+
+  // KPI
+  totalMembers   = 0;
+  dailyCapacityH = 0;
+  workingDaysLeft = 0;
+  roleCounts: Record<string, number> = {};
+
+  // Panels
+  projectHealth:    ProjectHealth[] = [];
+  overdueSprints:   SprintSummary[] = [];
+  closingThisWeek:  SprintSummary[] = [];
   upcomingHolidays: PublicHoliday[] = [];
-  issueTypeBreakdown: { label: string; count: number; color: string }[] = [];
+
+  // KPI counts
+  totalProjects    = 0;
+  activeSprintCount = 0;
 
   ngOnChanges(): void {
     this.compute();
   }
 
   private compute(): void {
-    const allMembers  = this.flattenNodes(this.hierarchy);
-    const active      = this.sprints.filter(s => s.status === 'Active');
-    const today       = new Date().toISOString().slice(0, 10);
+    const today   = new Date().toISOString().slice(0, 10);
+    const in7     = new Date(Date.now() + 7  * 86400000).toISOString().slice(0, 10);
+    const in30    = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
-    // members who logged something in last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-    const recentUsers  = new Set(
-      this.timeEntries
-        .filter(e => e.spentOn >= sevenDaysAgo)
-        .map(e => e.userName?.toLowerCase().trim())
-    );
-    const activeMembersToday = allMembers.filter(n =>
-      recentUsers.has(n.name.toLowerCase().trim())
-    ).length;
+    // ── Team from hierarchy ──────────────────────────────────────────────
+    const allMembers = this.flattenNodes(this.hierarchy);
+    this.totalMembers    = allMembers.length;
+    //this.developers      = allMembers.filter(n => n.role === 'Developer').length;
+    //this.managers        = allMembers.filter(n => n.role === 'Manager').length;
+    this.dailyCapacityH  = allMembers.reduce((s, n) => s + (n.dailyHours ?? 8), 0);
+    this.workingDaysLeft = this.countWorkingDaysLeft();
 
-    // utilization: logged vs budget across all visible entries
-    const weekBudget  = allMembers.length * (this.workingDays || 5) * 8;
-    const weekLogged  = this.timeEntries.reduce((s, e) => s + e.hours, 0);
+    this.roleCounts = allMembers.reduce((acc, member) => {
+      const role = member.role || 'Unknown';
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-    // sprint health avg
-    const sprintHealthAvg = active.length
-      ? Math.round(active.reduce((s, sp) =>
-          s + (sp.totalIssues ? ((sp.totalIssues - sp.openIssues) / sp.totalIssues) * 100 : 0), 0
-        ) / active.length)
-      : 0;
 
-    // team at risk (logged < 50% budget)
-    const budgetPerMember = (this.workingDays || 5) * 8;
-    const memberHours = new Map<string, number>();
-    this.timeEntries.forEach(e => {
-      const key = e.userName?.toLowerCase().trim() ?? '';
-      memberHours.set(key, (memberHours.get(key) ?? 0) + e.hours);
-    });
+    // ── Sprint bucketing ─────────────────────────────────────────────────
+    this.activeSprintCount = this.sprints.length;
+    this.overdueSprints    = this.sprints
+      .filter(s => s.endDate && s.endDate < today)
+      .sort((a, b) => a.endDate.localeCompare(b.endDate))
+      .slice(0, 6);
 
-    const teamAtRisk = allMembers
-      .map(n => ({
-        name: n.name,
-        utilization: Math.round(((memberHours.get(n.name.toLowerCase().trim()) ?? 0) / budgetPerMember) * 100)
-      }))
-      .filter(m => m.utilization < 50)
-      .sort((a, b) => a.utilization - b.utilization)
-      .slice(0, 5);
+    this.closingThisWeek = this.sprints
+      .filter(s => s.endDate && s.endDate >= today && s.endDate <= in7)
+      .sort((a, b) => a.endDate.localeCompare(b.endDate));
 
-    // upcoming holidays (next 30 days)
-    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    // ── Project health ───────────────────────────────────────────────────
+    this.totalProjects = this.projects.length;
+    this.projectHealth = this.projects.map(project => {
+      const ps = this.sprints.filter(s => s.projectId === project.id);
+      return {
+        project,
+        activeCount:     ps.length,
+        openIssues:      ps.reduce((s, x) => s + x.openIssues, 0),
+        overdueSprints:  ps.filter(s => s.endDate && s.endDate < today).length,
+        closingSoon:     ps.filter(s => s.endDate >= today && s.endDate <= in7).length
+      };
+    }).filter(p => p.activeCount > 0);   // only projects with active sprints
+
+    // ── Holidays ─────────────────────────────────────────────────────────
     this.upcomingHolidays = this.holidays
       .filter(h => h.date >= today && h.date <= in30)
-      .slice(0, 4);
+      .slice(0, 5);
+  }
 
-    // active sprints list
-    this.activeSprintList = active.slice(0, 6);
-
-    // issue type breakdown across all sprints
-    const totals = this.sprints.reduce(
-      (acc, s) => ({ bugs: acc.bugs + s.bugs, crs: acc.crs + s.crs, stories: acc.stories + s.stories,
-                     open: acc.open + s.openIssues }),
-      { bugs: 0, crs: 0, stories: 0, open: 0 }
-    );
-
-    this.issueTypeBreakdown = [
-      { label: 'Bugs',         count: totals.bugs,    color: '#dc2626' },
-      { label: 'Change Req.',  count: totals.crs,     color: '#d97706' },
-      { label: 'User Stories', count: totals.stories, color: '#2563eb' },
-      { label: 'Open Total',   count: totals.open,    color: '#64748b' },
-    ];
-
-    this.summary = {
-      totalMembers: allMembers.length,
-      activeMembersToday,
-      totalProjects: this.projects.length,
-      activeSprintsCount: active.length,
-      totalOpenIssues: totals.open,
-      totalBugs: totals.bugs,
-      totalCRs: totals.crs,
-      totalStories: totals.stories,
-      overallUtilization: weekBudget ? Math.round((weekLogged / weekBudget) * 100) : 0,
-      weekLoggedHours: Math.round(weekLogged),
-      weekBudgetHours: weekBudget,
-      sprintHealthAvg,
-      teamAtRisk
-    };
+  private countWorkingDaysLeft(): number {
+    const now   = new Date();
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of month
+    let count   = 0;
+    const cur   = new Date(now);
+    while (cur <= end) {
+      const d = cur.getDay();
+      if (d !== 0 && d !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
   }
 
   private flattenNodes(nodes: UserNode[]): UserNode[] {
     return nodes.flatMap(n => [n, ...this.flattenNodes(n.directReports ?? [])]);
   }
 
-  utilizationColor(pct: number): string {
-    if (pct >= 90) return 'green';
-    if (pct >= 70) return 'amber';
-    return 'red';
+  daysOverdue(endDate: string): number {
+    const diff = new Date().getTime() - new Date(endDate + 'T00:00:00').getTime();
+    return Math.floor(diff / 86400000);
   }
 
-  sprintPct(s: SprintSummary): number {
-    return s.totalIssues ? Math.round(((s.totalIssues - s.openIssues) / s.totalIssues) * 100) : 0;
+  daysUntil(endDate: string): number {
+    const diff = new Date(endDate + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0);
+    return Math.ceil(diff / 86400000);
+  }
+
+  projectInitials(name: string): string {
+    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  }
+
+  onViewSprints(): void {
+    this.navigateToSprints.emit();
   }
 }

@@ -20,8 +20,10 @@ export class RedmineService {
   private readonly apiKeyStorageKey = '6d18a984feda82e9a2b028bbe1163f932ccc67a3';
 
   // ── Cache ────────────────────────────────────────────────────────────────
-  private _allVersions: SprintSummary[] = [];
-  private _allIssues:   any[]           = [];
+  private _allVersions:    SprintSummary[] = [];
+  private _activeVersions: SprintSummary[] = [];  // only status === 'open'
+  private _allIssues:      any[]           = [];
+  private _activeIssues:   any[]           = [];  // issues scoped to active versions only
   private _cacheLoaded  = false;
   isLoading             = false;   // public so dashboard can show loader
 
@@ -194,44 +196,82 @@ export class RedmineService {
   // ];
 
   async loadAllData(): Promise<void> {
-
     this.isLoading = true;
 
     try {
-      // Run versions + issues + time entries in parallel
-      const [versionsResult, issuesResult] = await Promise.all([
-        this.fetchAllVersions(),
-        this.fetchAllIssues('all')
-      ]);
+      // Step 1: Fetch all versions for all projects in parallel
+      const versionsResult = await this.fetchAllVersions();
 
-      // Build sprint summaries from versions + issues (grouped in memory)
-      const versionMap = new Map<number, { version: any; projectId: number; projectName: string }>();
+      // Step 2: Separate active (open) vs non-active versions
+      const allVersionEntries:    { version: any; projectId: number; projectName: string }[] = [];
+      const activeVersionEntries: { version: any; projectId: number; projectName: string }[] = [];
+
       versionsResult.forEach(({ project, versions }) => {
         versions.forEach((v: any) => {
-          versionMap.set(v.id, { version: v, projectId: project.id, projectName: project.name });
+          const entry = { version: v, projectId: project.id, projectName: project.name };
+          allVersionEntries.push(entry);
+          if (v.status === 'open') {
+            activeVersionEntries.push(entry);
+          }
         });
       });
 
-      const issuesByVersion = new Map<number, any[]>();
-      issuesResult.forEach(issue => {
-        const vid = issue.fixed_version?.id;
-        if (!vid || !versionMap.has(vid)) return;
-        if (!issuesByVersion.has(vid)) issuesByVersion.set(vid, []);
-        issuesByVersion.get(vid)!.push(issue);
-      });
+      // Step 3: Fetch issues ONLY for active versions — one request per version, all in parallel
+      // const issuesByVersion = new Map<number, any[]>();
+      // await Promise.all(
+      //   activeVersionEntries.map(async ({ version, projectId }) => {
+      //     const issues = await this.fetchIssuesForVersion(version.id, projectId);
+      //     issuesByVersion.set(version.id, issues);
+      //   })
+      // );
 
-      this._allVersions = [];
-      versionMap.forEach(({ version, projectId, projectName }, versionId) => {
-        const issues = issuesByVersion.get(versionId) ?? [];
-        this._allVersions.push(this.mapVersionToSprint(version, projectId, projectName, issues));
-      });
+      // Step 4: Build SprintSummary for ALL versions (non-active get empty issues)
+      this._allVersions = allVersionEntries.map(({ version, projectId, projectName }) =>
+        this.mapVersionToSprint(version, projectId, projectName, [])
+      );
 
-      this._allIssues = issuesResult;
-      this._cacheLoaded = true;
+      // Step 5: Active-only views
+      this._activeVersions = this._allVersions.filter(s => s.status === 'Active');
+      this._activeIssues   = [].flat();
+      this._allIssues      = this._activeIssues;  // backward compat
+      this._cacheLoaded    = true;
 
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /** Fetch all issues for a single version (scoped, paginated, fast) */
+  private async fetchIssuesForVersion(versionId: number, projectId: number): Promise<any[]> {
+    const PAGE = 100;
+    const result: any[] = [];
+    let offset = 0;
+    let total = Infinity;
+
+    while (offset < total) {
+      const res = await lastValueFrom(
+        this.http.get<{ issues: any[]; total_count: number }>(
+          `${this.apiBaseUrl}/issues.json`,
+          {
+            headers: this.getHeaders(),
+            params: {
+              project_id: projectId.toString(),
+              fixed_version_id: versionId.toString(),
+              status_id: '*',
+              limit: PAGE.toString(),
+              offset: offset.toString()
+            }
+          }
+        )
+      );
+
+      result.push(...(res.issues ?? []));
+      total = res.total_count;
+      offset += PAGE;
+      if (result.length >= 500) break;  // safety cap per sprint
+    }
+
+    return result;
   }
 
   // Fetch all project versions in parallel
@@ -331,7 +371,11 @@ export class RedmineService {
       const response = await lastValueFrom(
         this.http.get<{ projects: any[] }>(
           `${this.apiBaseUrl}/projects.json`,
-          { headers: this.getHeaders() }
+          { headers: this.getHeaders(),
+            params: {
+              limit: 100,
+            }
+           }
         )
       );
 
@@ -421,48 +465,25 @@ export class RedmineService {
   //   }
   // }
 
+  /** All versions (Active + Closed + Planned), optionally filtered by project */
   getSprints(projectId = 'all'): SprintSummary[] {
-
     return projectId === 'all'
       ? this._allVersions
       : this._allVersions.filter(s => s.projectId === Number(projectId));
   }
 
-  // Single paginated fetch for all issues — max 2-3 calls total
-  private async fetchAllIssues(projectId = 'all'): Promise<any[]> {
-    const PAGE = 100;
-    const allIssues: any[] = [];
+  /** Only Active (open) sprints — fast, no closed/planned noise */
+  getActiveSprints(projectId = 'all'): SprintSummary[] {
+    return projectId === 'all'
+      ? this._activeVersions
+      : this._activeVersions.filter(s => s.projectId === Number(projectId));
+  }
 
-    let offset = 0;
-    let total = Infinity;
-
-    while (offset < total) {
-      const params: any = {
-        limit: PAGE.toString(),
-        offset: offset.toString(),
-        status_id: '*'
-      };
-
-      if (projectId !== 'all') {
-        params['project_id'] = projectId;
-      }
-
-      const res = await lastValueFrom(
-        this.http.get<{ issues: any[]; total_count: number }>(
-          `${this.apiBaseUrl}/issues.json`,
-          { headers: this.getHeaders(), params }
-        )
-      );
-
-      allIssues.push(...(res.issues ?? []));
-      total = res.total_count;
-      offset += PAGE;
-
-      // safety cap — don't fetch more than 1000 issues
-      if (allIssues.length >= 1000) break;
-    }
-
-    return allIssues;
+  /** Issues belonging to active sprints only */
+  getActiveIssues(projectId = 'all'): any[] {
+    return projectId === 'all'
+      ? this._activeIssues
+      : this._activeIssues.filter((i: any) => i.project?.id === Number(projectId));
   }
 
   private mapVersionToSprint(
@@ -646,6 +667,12 @@ export class RedmineService {
   //   });
   // }
 
+  private flattenHierarchy(nodes: UserNode[]): UserNode[] {
+    return nodes.flatMap(node => [
+      node,
+      ...(node.directReports ? this.flattenHierarchy(node.directReports) : [])
+    ]);
+  }
   calculateCapacity(startDate: string, endDate: string, hierarchy: UserNode[], entries: TimeEntry[]): CapacitySnapshot {
     const weekdays = this.countWeekdays(startDate, endDate);
     const holidays = this.getHolidaysInRange(startDate, endDate);
@@ -653,13 +680,23 @@ export class RedmineService {
     const grossHours = weekdays * dailyCapacityHours;
     const holidayDeductionHours = holidays.length * dailyCapacityHours;
 
+    // Team users from hierarchy
+    const teamUserName = new Set(
+      this.flattenHierarchy(hierarchy).map(u => u.name.toLowerCase().trim())
+    );
+
+    // Only team members' entries
+    const teamEntries = entries.filter(
+      e => teamUserName.has(e.userName.toLowerCase().trim())
+    );
+
     return {
       workingDays: weekdays - holidays.length,
       holidayCount: holidays.length,
       grossHours,
       holidayDeductionHours,
       budgetHours: grossHours - holidayDeductionHours,
-      loggedHours: this.sumHours(entries)
+      loggedHours: this.sumHours(teamEntries)
     };
   }
 
@@ -680,8 +717,9 @@ export class RedmineService {
   }
 
   sumHours(entries: TimeEntry[]): number {
-    return entries.reduce((sum, entry) => sum + entry.hours, 0);
-  }
+
+  return entries.reduce((sum, entry) => sum + entry.hours, 0);
+}
 
   private countWeekdays(startDate: string, endDate: string): number {
     let count = 0;

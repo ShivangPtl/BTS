@@ -5,5 +5,12 @@
     "changeOrigin": true,
     "pathRewrite": { "^/redmine-api": "" },
     "logLevel": "debug"
+  },
+  "/bts-api": {
+    "target": "http://localhost:5073",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/bts-api": "" },
+    "logLevel": "debug"
   }
 }
