@@ -50,8 +50,25 @@
             [timeEntries]="visibleTimeEntries">
           </app-hierarchy-bar>
         </article>
-
-        <aside class="panel">
+<article class="panel">
+          <div class="panel-header compact">
+            <div>
+              <span class="panel-kicker">Task mix</span>
+              <h2>Stories, tasks, bugs, CRs</h2>
+            </div>
+          </div>
+          <apx-chart
+            *ngIf="issueChartOptions"
+            [series]="issueChartOptions.series"
+            [chart]="issueChartOptions.chart"
+            [labels]="issueChartOptions.labels"
+            [colors]="issueChartOptions.colors"
+            [legend]="issueChartOptions.legend"
+            [dataLabels]="issueChartOptions.dataLabels"
+            [tooltip]="issueChartOptions.tooltip">
+          </apx-chart>
+        </article>
+        <!-- <aside class="panel">
           <div class="panel-header compact">
             <div>
               <span class="panel-kicker">Holiday adjustment</span>
@@ -79,11 +96,11 @@
               <span>{{ holiday.name }}</span>
             </div>
           </div>
-        </aside>
+        </aside> -->
       </section>
 
       <section class="chart-grid">
-        <article class="panel">
+        <article class="panel wide">
           <div class="panel-header compact">
             <div>
               <span class="panel-kicker">Project-wise</span>
@@ -104,7 +121,7 @@
           </apx-chart>
         </article>
 
-        <article class="panel">
+        <!-- <article class="panel">
           <div class="panel-header compact">
             <div>
               <span class="panel-kicker">Task mix</span>
@@ -121,7 +138,7 @@
             [dataLabels]="issueChartOptions.dataLabels"
             [tooltip]="issueChartOptions.tooltip">
           </apx-chart>
-        </article>
+        </article> -->
 
         <article class="panel wide">
           <div class="panel-header compact">

@@ -1,5 +1,4 @@
 export type UserRole = 'Manager' | 'Developer';
-export type IssueType = 'User Story' | 'Task' | 'Bug' | 'CR' | 'Support' | 'Meeting';
 
 export interface UserNode {
   id: number;
@@ -45,8 +44,8 @@ export interface TimeEntry {
   projectId: number;
   sprintId: number;
   issueId: number;
+  issueType: string
   issueSubject: string;
-  issueType: IssueType;
   hours: number;
   spentOn: string;
 }

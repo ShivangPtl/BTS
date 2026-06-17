@@ -12,7 +12,6 @@ import { HierarchyBarComponent } from './components/hierarchy-bar/hierarchy-bar.
 import { OverviewComponent } from "./components/overview/overview.component";
 import {
   CapacitySnapshot,
-  IssueType,
   PublicHoliday,
   RedmineProject,
   SprintSummary,
@@ -306,7 +305,7 @@ export class DashboardComponent implements OnInit {
   private configureCharts(): void {
     const projectNames = this.projectRollups.map(item => item.project.name);
     const projectHours = this.projectRollups.map(item => item.logged);
-    const issueTypes: IssueType[] = ['User Story', 'Task', 'Bug', 'CR', 'Support', 'Meeting'];
+    const issueTypes = [...new Set(this.timeEntries.map(entry => entry.issueType))];
     const issueSeries = issueTypes.map(type => this.redmineService.sumHours(this.timeEntries.filter(entry => entry.issueType === type)));
     const dateBuckets = this.buildDateBuckets();
 

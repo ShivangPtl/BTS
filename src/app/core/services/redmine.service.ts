@@ -592,6 +592,105 @@ export class RedmineService {
   private fetchToken = 0;
 
   async getSpentTime(
+  startDate: string,
+  endDate: string,
+  projectId = 'all'
+): Promise<TimeEntry[]> {
+  this.isLoading = true;
+  const token = ++this.fetchToken;
+
+  // Build params without offset or limit since pagination isn't used
+  const p: any = {
+    spent_on: `><${startDate}|${endDate}`
+  };
+  if (projectId !== 'all') p['project_id'] = projectId;
+
+  // Helper function to parse a CSV line safely, managing quoted text fields
+  const parseCSVLine = (line: string): string[] => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const mapCSVToEntry = (row: string[]): TimeEntry | null => {
+    // Basic structural check: Row must have data and not be the header row
+    if (row.length < 7 || row[0] === 'Project' || !row[0]) return null;
+
+    // Extract numerical ID from strings like: "Task #352893: Meeting..."
+    const issueMatch = row[4].match(/#(\d+)/);
+    const issueId = issueMatch ? parseInt(issueMatch[1], 10) : 0;
+
+    // Reformat DD-MM-YYYY dates to standard YYYY-MM-DD strings
+    let formattedDate = row[1];
+    const dateParts = row[1].split('-');
+    if (dateParts.length === 3 && dateParts[2].length === 4) {
+      formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+    }
+
+    return {
+      id: 0,                   // CSV does not provide raw database Time Entry IDs
+      userId: 0,               // CSV only gives User Name text strings
+      userName: row[2],
+      redmineUserId: 0,
+      projectId: 0,            // CSV only gives Project Name text strings
+      sprintId: 0,             // Reminder: CSV lacks version/sprint details
+      issueId: issueId,
+      issueSubject: row[5] ? row[5].replace(/^"|"$/g, '') : '', // Strip outer quotes
+      issueType: row[3],
+      hours: parseFloat(row[6]) || 0,
+      spentOn: formattedDate
+    };
+  };
+
+  try {
+    // Single HTTP call to retrieve the entire report
+    const rawCsv = await lastValueFrom(
+      this.http.get(`${this.apiBaseUrl}/time_entries.csv`, {
+        headers: this.getHeaders(),
+        params: p,
+        responseType: 'text' // Treats response payload as plain text instead of parsing JSON
+      })
+    );
+
+    // Safeguard to ensure this fetch corresponds to the most recent user action
+    if (token !== this.fetchToken) return [];
+
+    const lines = rawCsv.split(/\r?\n/);
+    const results: TimeEntry[] = [];
+
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const row = parseCSVLine(line);
+      const entry = mapCSVToEntry(row);
+      if (entry) results.push(entry);
+    });
+
+    return results;
+
+  } catch (err) {
+    console.warn('Time entries CSV dump fetch failed', err);
+    return [];
+  } finally {
+    if (token === this.fetchToken) this.isLoading = false;
+  }
+}
+
+
+
+  async getSpentTime1(
     startDate: string,
     endDate: string,
     projectId = 'all'
