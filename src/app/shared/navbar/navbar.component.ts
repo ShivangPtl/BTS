@@ -64,15 +64,16 @@ export class NavbarComponent implements OnInit {
   navItems: { key: AppView; label: string }[] = [
     { key: 'overview',    label: 'Overview' },
     { key: 'utilization', label: 'Utilization' },
-    { key: 'sprints',     label: 'Sprints' },
-    { key: 'issues',      label: 'Issues' },
-    { key: 'admin',       label: 'Admin' },
+    // { key: 'sprints',     label: 'Sprints' },
+    // { key: 'issues',      label: 'Issues' },
+    // { key: 'admin',       label: 'Admin' },
   ];
 
   ngOnInit(): void {
     const { start, end } = this.getPresetRange('this-month');
     this.startDateChange.emit(start);
     this.endDateChange.emit(end);
+    this.selectedProjectIdChange.emit('all');
     const d = new Date(start);
     this.viewYear  = d.getFullYear();
     this.viewMonth = d.getMonth();

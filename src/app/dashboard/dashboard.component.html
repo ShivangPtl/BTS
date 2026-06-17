@@ -47,25 +47,29 @@
           <app-hierarchy-bar
             [nodes]="visibleHierarchy"
             [workingDays]="capacity.workingDays"
-            [timeEntries]="visibleTimeEntries">
+            [timeEntries]="visibleTimeEntries"
+            (focusChange)="onHierarchyFocusChange($event)">
           </app-hierarchy-bar>
         </article>
-<article class="panel">
+        <article class="panel">
           <div class="panel-header compact">
             <div>
               <span class="panel-kicker">Task mix</span>
-              <h2>Stories, tasks, bugs, CRs</h2>
+              <h2>{{ taskMixFocusName }}</h2>
             </div>
           </div>
           <apx-chart
-            *ngIf="issueChartOptions"
-            [series]="issueChartOptions.series"
-            [chart]="issueChartOptions.chart"
-            [labels]="issueChartOptions.labels"
-            [colors]="issueChartOptions.colors"
-            [legend]="issueChartOptions.legend"
-            [dataLabels]="issueChartOptions.dataLabels"
-            [tooltip]="issueChartOptions.tooltip">
+            *ngIf="taskMixChartOptions"
+            [series]="taskMixChartOptions.series"
+            [chart]="taskMixChartOptions.chart"
+            [colors]="taskMixChartOptions.colors"
+            [plotOptions]="taskMixChartOptions.plotOptions"
+            [dataLabels]="taskMixChartOptions.dataLabels"
+            [xaxis]="taskMixChartOptions.xaxis"
+            [yaxis]="taskMixChartOptions.yaxis"
+            [grid]="taskMixChartOptions.grid"
+            [legend]="taskMixChartOptions.legend"
+            [tooltip]="taskMixChartOptions.tooltip">
           </apx-chart>
         </article>
         <!-- <aside class="panel">
@@ -121,24 +125,9 @@
           </apx-chart>
         </article>
 
-        <!-- <article class="panel">
-          <div class="panel-header compact">
-            <div>
-              <span class="panel-kicker">Task mix</span>
-              <h2>Stories, tasks, bugs, CRs</h2>
-            </div>
-          </div>
-          <apx-chart
-            *ngIf="issueChartOptions"
-            [series]="issueChartOptions.series"
-            [chart]="issueChartOptions.chart"
-            [labels]="issueChartOptions.labels"
-            [colors]="issueChartOptions.colors"
-            [legend]="issueChartOptions.legend"
-            [dataLabels]="issueChartOptions.dataLabels"
-            [tooltip]="issueChartOptions.tooltip">
-          </apx-chart>
-        </article> -->
+        <!-- Task Mix now lives in the split-grid above, next to the hierarchy bar,
+             so it can stay in sync with whoever is selected/drilled into. -->
+
 
         <article class="panel wide">
           <div class="panel-header compact">
@@ -162,7 +151,7 @@
         </article>
       </section>
 
-      <section class="table-grid">
+      <!-- <section class="table-grid">
         <article class="panel">
           <div class="panel-header compact">
             <div>
@@ -181,7 +170,7 @@
             </div>
           </div>
         </article>
-      </section>
+      </section> -->
     }
 
     <!-- ══ SPRINTS ══ -->

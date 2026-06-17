@@ -29,119 +29,6 @@ export class RedmineService {
     { date: '2026-06-19', name: 'Regional Holiday', hoursDeducted: 8 }
   ];
 
-  private readonly hierarchyData: UserNode[] = [
-    {
-      id: 10,
-      redmineUserId: 10,
-      name: "Rupa Golwala",
-      designation: 'Delivery Head',
-      role: 'Manager',
-      dailyHours: 8,
-      directReports: [
-        {
-          id: 20,
-          redmineUserId: 20,
-          name: 'Paresh Kalriya',
-          designation: 'Engineering Manager',
-          role: 'Manager',
-          reportsTo: 10,
-          dailyHours: 8,
-          directReports: [
-            {
-              id: 101,
-              redmineUserId: 101,
-              name: 'Shivang Patel',
-              designation: 'Developer',
-              role: 'Developer',
-              reportsTo: 20,
-              dailyHours: 8,
-              directReports: [
-                {
-                  id: 201,
-                  redmineUserId: 201,
-                  name: 'Jaimin Vasveliya',
-                  designation: 'Jr. Developer',
-                  role: 'Developer',
-                  reportsTo: 101,
-                  dailyHours: 8,
-                  directReports: []
-                }
-              ]
-            },
-            {
-              id: 102,
-              redmineUserId: 102,
-              name: 'Kiran Gami',
-              designation: 'Developer',
-              role: 'Developer',
-              reportsTo: 20,
-              dailyHours: 8,
-              directReports: [
-                {
-                  id: 202,
-                  redmineUserId: 202,
-                  name: 'Aman Gupta',
-                  designation: 'Jr. Developer',
-                  role: 'Developer',
-                  reportsTo: 102,
-                  dailyHours: 8,
-                  directReports: []
-                }
-              ]
-            },
-            {
-              id: 104,
-              redmineUserId: 104,
-              name: 'Rahul Giri',
-              designation: 'Developer',
-              role: 'Developer',
-              reportsTo: 20,
-              dailyHours: 8
-            },
-            {
-              id: 105,
-              redmineUserId: 105,
-              name: 'Nilkanth Pund',
-              designation: 'Developer',
-              role: 'Developer',
-              reportsTo: 20,
-              dailyHours: 8
-            }
-          ]
-        },
-        {
-          id: 30,
-          redmineUserId: 30,
-          name: 'QA Lead Team',
-          designation: 'QA Manager',
-          role: 'Manager',
-          reportsTo: 10,
-          dailyHours: 8,
-          directReports: [
-            {
-              id: 104,
-              redmineUserId: 104,
-              name: 'Aarti Joshi',
-              designation: 'QA Engineer',
-              role: 'Developer',
-              reportsTo: 30,
-              dailyHours: 8
-            },
-            {
-              id: 105,
-              redmineUserId: 105,
-              name: 'Mehul Trivedi',
-              designation: 'QA Engineer',
-              role: 'Developer',
-              reportsTo: 30,
-              dailyHours: 8
-            }
-          ]
-        }
-      ]
-    }
-  ];
-
   private projects: RedmineProject[] = [];
 
   // private readonly sprints: SprintSummary[] = [
@@ -333,7 +220,7 @@ export class RedmineService {
     return this.http.get<UserNode[]>('/bts-api/api/hierarchy', { headers }).pipe(
       catchError(err => {
         console.warn('Hierarchy API failed, using mock', err);
-        return of(this.hierarchyData);
+        return of([]);
       })
     );
   }
@@ -603,7 +490,6 @@ export class RedmineService {
   const p: any = {
     spent_on: `><${startDate}|${endDate}`
   };
-  if (projectId !== 'all') p['project_id'] = projectId;
 
   // Helper function to parse a CSV line safely, managing quoted text fields
   const parseCSVLine = (line: string): string[] => {
@@ -640,12 +526,14 @@ export class RedmineService {
       formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
     }
 
+    const projectId = this.projects.find(project => project.name === row[0])?.id || 0;
+
     return {
       id: 0,                   // CSV does not provide raw database Time Entry IDs
       userId: 0,               // CSV only gives User Name text strings
       userName: row[2],
       redmineUserId: 0,
-      projectId: 0,            // CSV only gives Project Name text strings
+      projectId: projectId,            // CSV only gives Project Name text strings
       sprintId: 0,             // Reminder: CSV lacks version/sprint details
       issueId: issueId,
       issueSubject: row[5] ? row[5].replace(/^"|"$/g, '') : '', // Strip outer quotes
@@ -677,6 +565,10 @@ export class RedmineService {
       const entry = mapCSVToEntry(row);
       if (entry) results.push(entry);
     });
+
+    if (projectId != 'all') {
+      return results.filter(entry => entry.projectId === Number(projectId));
+    }
 
     return results;
 

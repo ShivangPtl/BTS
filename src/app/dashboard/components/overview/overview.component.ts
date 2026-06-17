@@ -62,7 +62,7 @@ export class OverviewComponent implements OnChanges {
     this.workingDaysLeft = this.countWorkingDaysLeft();
 
     this.roleCounts = allMembers.reduce((acc, member) => {
-      const role = member.role || 'Unknown';
+      const role = member.designation || 'Unknown';
       acc[role] = (acc[role] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);

@@ -632,3 +632,18 @@ meter {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Task Mix panel ──────────────────────────────────────────────────────
+   Horizontal ranked bar replaces the old donut. Capped max-height with its
+   own scroll keeps the panel from forcing the whole row taller when many
+   activity types are present, without clipping or wrapping the legend
+   (there is no legend now — categories are the y-axis labels). */
+.split-grid .panel:not(.large) {
+  display: flex;
+  flex-direction: column;
+}
+
+.split-grid .panel:not(.large) apx-chart {
+  overflow-y: auto;
+  display: block;
+}

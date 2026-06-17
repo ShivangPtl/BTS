@@ -1,9 +1,11 @@
 import { Injectable } from '@angular/core';
 import { TimeEntry, UserNode } from '../../dashboard/dashboard.model';
 import { AppUserSession } from './auth.service';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class HierarchyAccessService {
+  constructor(private authservice: AuthService) {}
 
   // Returns the subtree the logged-in user is allowed to see
   getVisibleHierarchy(
@@ -11,7 +13,7 @@ export class HierarchyAccessService {
     session: AppUserSession,
     timeEntries: TimeEntry[]
   ): UserNode[] {
-    if (session.role === 'SuperAdmin') {
+    if (this.authservice.isAdmin) {
       return fullHierarchy;  // sees everything
     }
 

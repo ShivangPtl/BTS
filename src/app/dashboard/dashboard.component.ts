@@ -8,7 +8,7 @@ import { AppUserSession, AuthService } from '../core/services/auth.service';
 import { HierarchyAccessService } from '../core/services/hierarchy-access.service';
 import { RedmineService } from '../core/services/redmine.service';
 import { AppView, NavbarComponent } from '../shared/navbar/navbar.component';
-import { HierarchyBarComponent } from './components/hierarchy-bar/hierarchy-bar.component';
+import { FocusSelection, HierarchyBarComponent } from './components/hierarchy-bar/hierarchy-bar.component';
 import { OverviewComponent } from "./components/overview/overview.component";
 import {
   CapacitySnapshot,
@@ -85,8 +85,13 @@ export class DashboardComponent implements OnInit {
   projectRollups: ProjectRollup[] = [];
   timesheetGaps: TimesheetGap[] = [];
   projectChartOptions: any;
-  issueChartOptions: any;
+  taskMixChartOptions: any;
   dateTrendOptions: any;
+
+  // Who/what the Task Mix widget is currently showing — kept in sync with
+  // the hierarchy bar's drilldown/selection via (focusChange).
+  taskMixFocusName = '';
+  taskMixFocusScope: 'subtree' | 'own' = 'subtree';
 
   session: AppUserSession | null = null;
   visibleHierarchy: UserNode[] = [];
@@ -138,6 +143,19 @@ export class DashboardComponent implements OnInit {
       this.timeEntries,
       this.visibleHierarchy
     );
+
+    // Default Task Mix focus = the logged-in user's own root + their whole
+    // visible team, matching the hierarchy bar's initial "Top view" state.
+    const root = this.visibleHierarchy[0];
+    this.taskMixFocusName = root ? root.name : '';
+    this.taskMixFocusScope = 'subtree';
+  }
+
+  // ── Keep Task Mix in sync with whatever the hierarchy bar is focused on ──
+  onHierarchyFocusChange(selection: FocusSelection): void {
+    this.taskMixFocusName = selection.name;
+    this.taskMixFocusScope = selection.scope;
+    this.configureTaskMixChart(selection.entries);
   }
 
   onViewChange(view: AppView): void {
@@ -305,8 +323,6 @@ export class DashboardComponent implements OnInit {
   private configureCharts(): void {
     const projectNames = this.projectRollups.map(item => item.project.name);
     const projectHours = this.projectRollups.map(item => item.logged);
-    const issueTypes = [...new Set(this.timeEntries.map(entry => entry.issueType))];
-    const issueSeries = issueTypes.map(type => this.redmineService.sumHours(this.timeEntries.filter(entry => entry.issueType === type)));
     const dateBuckets = this.buildDateBuckets();
 
     this.projectChartOptions = {
@@ -321,15 +337,9 @@ export class DashboardComponent implements OnInit {
       tooltip: { y: { formatter: (value: number) => `${value} hours logged` } }
     };
 
-    this.issueChartOptions = {
-      series: issueSeries,
-      chart: { type: 'donut', height: 280, fontFamily: 'Inter, Segoe UI, sans-serif' },
-      labels: issueTypes,
-      colors: ['#0f766e', '#2563eb', '#dc2626', '#9333ea', '#d97706', '#64748b'],
-      legend: { position: 'bottom' },
-      dataLabels: { enabled: true, formatter: (value: number) => `${Math.round(value)}%` },
-      tooltip: { y: { formatter: (value: number) => `${value} hours` } }
-    };
+    // Task Mix defaults to the logged-in user's own visible subtree —
+    // it gets refreshed to match drilldown/selection via onHierarchyFocusChange.
+    this.configureTaskMixChart(this.visibleTimeEntries);
 
     this.dateTrendOptions = {
       series: [
@@ -344,6 +354,75 @@ export class DashboardComponent implements OnInit {
       yaxis: { labels: { formatter: (value: number) => `${value}h` } },
       grid: { borderColor: '#e2e8f0' },
       tooltip: { y: { formatter: (value: number) => `${value} hours` } }
+    };
+  }
+
+  // ── Task Mix: horizontal ranked bar, scoped to whoever is focused ────────
+  // Replaces the old donut, which crushed small slices (1-5%) into
+  // unreadable slivers once there were 8-12 activity categories.
+  private configureTaskMixChart(entries: TimeEntry[]): void {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const issueTypes = [...new Set(entries.map(entry => entry.issueType))];
+
+    let rows = issueTypes
+      .map(type => ({
+        type,
+        hours: r2(this.redmineService.sumHours(entries.filter(e => e.issueType === type)))
+      }))
+      .filter(row => row.hours > 0)
+      .sort((a, b) => b.hours - a.hours);
+
+
+    const totalHours = rows.reduce((s, r) => s + r.hours, 0);
+
+    rows = rows.filter(row => (row.hours / totalHours) * 100 > 0.5);
+
+    const palette = ['#2563eb', '#0f766e', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#65a30d', '#db2777', '#64748b', '#7c3aed', '#ea580c', '#0d9488'];
+
+    const manyRows = rows.length > 7;
+
+    this.taskMixChartOptions = {
+      series: [{ name: 'Hours', data: rows.map(r => r.hours) }],
+      chart: {
+        type: 'bar',
+        height: Math.max(220, rows.length * 34),
+        toolbar: { show: false },
+        fontFamily: 'Inter, Segoe UI, sans-serif'
+      },
+      colors: rows.map((_, i) => palette[i % palette.length]),
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          barHeight: manyRows ? '65%' : '55%',
+          distributed: true,
+          borderRadius: 4,
+          borderRadiusApplication: 'end',
+          dataLabels: { position: 'top' }
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        textAnchor: 'start',
+        offsetX: 4,
+        formatter: (val: number) => {
+          const pct = Math.round((val / totalHours) * 100);
+          return `${r2(val)}h (${pct}%)`;
+        },
+        style: { fontSize: '11px', fontWeight: 700, colors: ['#334155'] },
+        background: { enabled: false }
+      },
+      xaxis: {
+        categories: rows.map(r => r.type),
+        labels: { formatter: (v: number) => `${v}h`, style: { colors: '#94a3b8', fontSize: '11px' } }
+      },
+      yaxis: {
+        labels: { style: { colors: '#334155', fontSize: '12px', fontWeight: 600 } }
+      },
+      grid: { borderColor: '#eef2f7', xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } },
+      legend: { show: false },
+      tooltip: {
+        y: { formatter: (value: number) => `${r2(value)} hours (${Math.round((value / totalHours) * 100)}%)` }
+      }
     };
   }
 

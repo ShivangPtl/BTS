@@ -102,18 +102,14 @@
       </div>
       <div class="team-structure">
         <div class="team-stat-row">
-          <ng-container *ngFor="let role of roleCounts | keyvalue; let last = last">
+          <ng-container *ngFor="let role of roleCounts | keyvalue">
 
             <div class="team-stat">
               <span class="team-stat-val">{{ role.value }}</span>
               <span class="team-stat-lbl">{{ role.key }}</span>
             </div>
 
-            <div class="team-divider" *ngIf="!last"></div>
-
           </ng-container>
-
-          <div class="team-divider" *ngIf="(roleCounts | keyvalue).length"></div>
 
           <div class="team-stat">
             <span class="team-stat-val">{{ dailyCapacityH }}h</span>

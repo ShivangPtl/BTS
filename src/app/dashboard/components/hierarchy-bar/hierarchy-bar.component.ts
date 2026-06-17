@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, Input, NgZone, OnChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, Input, NgZone, OnChanges, Output } from '@angular/core';
 import { NgApexchartsModule } from 'ng-apexcharts';
 import { TimeEntry, UserNode } from '../../dashboard.model';
 
@@ -17,6 +17,17 @@ interface ChartRow {
   originalNode: UserNode;
 }
 
+// Emitted to the parent so other widgets (e.g. Task Mix chart) can stay
+// in sync with whatever the hierarchy bar is currently focused on.
+export interface FocusSelection {
+  node: UserNode;
+  name: string;
+  // 'subtree' = root/top view, no one drilled into yet -> show node + whole team
+  // 'own'     = a specific person is selected inside a drilldown -> show only their own entries
+  scope: 'subtree' | 'own';
+  entries: TimeEntry[];
+}
+
 @Component({
   selector: 'app-hierarchy-bar',
   standalone: true,
@@ -28,6 +39,10 @@ export class HierarchyBarComponent implements OnChanges {
   @Input() nodes: UserNode[] = [];
   @Input() workingDays = 0;
   @Input() timeEntries: TimeEntry[] = [];
+
+  // Tells the parent who/what is currently focused, so sibling widgets
+  // (Task Mix chart) can filter themselves to match.
+  @Output() focusChange = new EventEmitter<FocusSelection>();
 
   chartOptions: any;
   navigationHistory: UserNode[] = [];
@@ -58,36 +73,63 @@ export class HierarchyBarComponent implements OnChanges {
       ? this.ownEntries(this.focusedRow.originalNode)
       : [];
     this.buildChart();
+    this.emitFocus('subtree');
   }
 
   // ── Drilldown layer: ancestor bar + team bars ────────────────────────────
-  renderLayer(manager: UserNode): void {
+  renderLayer(manager: UserNode, keepOwnFocus = false): void {
     const ancestorRow = this.buildRow(manager, true);   // highlighted ancestor
     const teamRows = (manager.directReports ?? []).map(n => this.buildRow(n, false));
     this.currentRows = [ancestorRow, ...teamRows];
-    this.focusedRow = ancestorRow;
-    this.selectedEntries = this.ownEntries(manager);
+
+    if (!keepOwnFocus) {
+      // Entering this layer directly (e.g. via Back/breadcrumb), not via a
+      // click on a specific person — default focus is the anchor's subtree.
+      this.focusedRow = ancestorRow;
+      this.selectedEntries = this.ownEntries(manager);
+      this.buildChart();
+      this.emitFocus('subtree');
+      return;
+    }
+
     this.buildChart();
   }
 
   // ── Click on a bar ───────────────────────────────────────────────────────
+  // "Opening" Rupa (clicking her bar at root/top view, which drills into
+  // her team) must show Rupa + her team's combined mix — that's the
+  // 'subtree' scope. Re-clicking the ancestor strip once already inside her
+  // drilldown re-affirms the same Rupa + team view. Only clicking a team
+  // member who has no further reports (a leaf) narrows down to that one
+  // person's own mix.
   handleBarClick(row: ChartRow): void {
+    this.focusedRow = row;
+    this.selectedEntries = this.ownEntries(row.originalNode);
+
+    const hasReports = !!row.originalNode.directReports?.length;
+
     if (row.isAncestor) {
-      // clicking the ancestor bar just refocuses its own entries
-      this.focusedRow = row;
-      this.selectedEntries = this.ownEntries(row.originalNode);
+      this.emitFocus('own');
       this.cdr.detectChanges();
       return;
     }
 
-    this.focusedRow = row;
-    this.selectedEntries = this.ownEntries(row.originalNode);
+    if (hasReports) {
+      // Either re-clicking the current anchor, or opening someone who has
+      // a team beneath them — both cases show that person + their team.
+      this.emitFocus('subtree');
 
-    if (row.originalNode.directReports?.length) {
-      this.navigationHistory.push(row.originalNode);
-      this.renderLayer(row.originalNode);
+      if (!row.isAncestor) {
+        this.navigationHistory.push(row.originalNode);
+        this.renderLayer(row.originalNode, /* keepOwnFocus */ true);
+      }
+
+      this.cdr.detectChanges();
+      return;
     }
 
+    // Leaf team member (no one reporting to them) — own mix only.
+    this.emitFocus('own');
     this.cdr.detectChanges();
   }
 
@@ -109,6 +151,25 @@ export class HierarchyBarComponent implements OnChanges {
       e.userId === node.id ||
       e.userName?.toLowerCase().trim() === node.name.toLowerCase().trim()
     );
+  }
+
+  // ── All entries for a node + everyone reporting up to them ───────────────
+  private subtreeEntries(node: UserNode): TimeEntry[] {
+    const own = this.ownEntries(node);
+    const team = (node.directReports ?? []).flatMap(c => this.subtreeEntries(c));
+    return [...own, ...team];
+  }
+
+  // ── Tell the parent who's focused right now, for sibling widgets ─────────
+  private emitFocus(scope: 'subtree' | 'own'): void {
+    if (!this.focusedRow) return;
+    const node = this.focusedRow.originalNode;
+    this.focusChange.emit({
+      node,
+      name: this.focusedRow.name,
+      scope,
+      entries: scope === 'subtree' ? this.subtreeEntries(node) : this.ownEntries(node)
+    });
   }
 
   // ── Build a ChartRow ─────────────────────────────────────────────────────

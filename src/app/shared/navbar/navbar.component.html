@@ -2,10 +2,10 @@
 
   <div class="topnav-top">
     <div class="topnav-brand">
-      <div class="brand-mark">B</div>
+      <div class="brand-mark">P</div>
       <div class="brand-copy">
-        <strong>BTS Control</strong>
-        <span>Redmine cockpit</span>
+        <strong>BTS Dashboard</strong>
+        <span>Prompt DairyTech</span>
       </div>
     </div>
 
@@ -34,7 +34,7 @@
     <!-- Project -->
     <div class="filter-group">
       <span class="filter-label">Project</span>
-      <select [(ngModel)]="selectedProjectId" (change)="filterChange.emit()">
+      <select [(ngModel)]="selectedProjectId" (change)="this.selectedProjectIdChange.emit(selectedProjectId); filterChange.emit()">
         <option value="all">All projects</option>
         <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
       </select>
