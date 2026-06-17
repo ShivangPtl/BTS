@@ -150,18 +150,16 @@ export class DashboardComponent implements OnInit {
   async loadDashboardData(): Promise<void> {
     this.isLoading = true;
 
-    const res = await this.redmineService.getProjects();
-    this.projects = res.projects;
-
-    // load hierarchy and holidays in parallel with the big data load
-    const [hierarchy, holidays] = await Promise.all([
+    // Run everything in parallel — projects, hierarchy, holidays, versions
+    const [projectsRes, hierarchy, holidays] = await Promise.all([
+      this.redmineService.getProjects(),
       lastValueFrom(this.redmineService.getHierarchy()),
-      lastValueFrom(this.redmineService.getPublicHolidays()),
-      this.redmineService.loadAllData()   // versions + issues + entries cached here
+      lastValueFrom(this.redmineService.getPublicHolidays())
     ]);
 
+    this.projects  = projectsRes.projects;
     this.hierarchy = hierarchy;
-    this.holidays = holidays;
+    this.holidays  = holidays;
     this.isLoading = false;
 
     this.fetchFilteredData();
@@ -237,18 +235,19 @@ export class DashboardComponent implements OnInit {
   }
 
   private buildKpis(): KpiCard[] {
-    const gap = this.capacity.budgetHours - this.capacity.loggedHours;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const gap = r2(this.capacity.budgetHours - this.capacity.loggedHours);
 
     return [
       {
         label: 'Budget Hours',
-        value: `${this.capacity.budgetHours}h`,
-        helper: `${this.capacity.holidayDeductionHours}h deducted for public holidays`,
+        value: `${r2(this.capacity.budgetHours)}h`,
+        helper: `${r2(this.capacity.holidayDeductionHours)}h deducted for public holidays`,
         tone: 'blue'
       },
       {
         label: 'Logged In Redmine',
-        value: `${this.capacity.loggedHours}h`,
+        value: `${r2(this.capacity.loggedHours)}h`,
         helper: `${this.utilization}% utilization against budget`,
         tone: this.utilization >= 90 ? 'green' : this.utilization >= 75 ? 'amber' : 'red'
       },

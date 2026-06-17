@@ -41,19 +41,19 @@
       <div class="focused-stats">
         <div>
           <span>Own logged</span>
-          <strong>{{ focusedRow.ownLogged }}h</strong>
+          <strong>{{ focusedRow.ownLogged | number:'1.0-2' }}h</strong>
         </div>
         <div>
           <span>Own budget</span>
-          <strong>{{ focusedRow.ownBudget }}h</strong>
+          <strong>{{ focusedRow.ownBudget | number:'1.0-2' }}h</strong>
         </div>
         <div *ngIf="focusedRow.teamBudget > 0">
           <span>Team logged</span>
-          <strong>{{ focusedRow.teamLogged }}h</strong>
+          <strong>{{ focusedRow.teamLogged | number:'1.0-2' }}h</strong>
         </div>
         <div *ngIf="focusedRow.teamBudget > 0">
           <span>Team budget</span>
-          <strong>{{ focusedRow.teamBudget }}h</strong>
+          <strong>{{ focusedRow.teamBudget | number:'1.0-2' }}h</strong>
         </div>
         <div>
           <span>Utilization</span>

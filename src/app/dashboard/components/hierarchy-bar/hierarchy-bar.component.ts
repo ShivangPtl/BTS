@@ -38,7 +38,7 @@ export class HierarchyBarComponent implements OnChanges {
   constructor(
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
-  ) {}
+  ) { }
 
   ngOnChanges(): void {
     if (!this.nodes.length) return;
@@ -113,10 +113,10 @@ export class HierarchyBarComponent implements OnChanges {
 
   // ── Build a ChartRow ─────────────────────────────────────────────────────
   private buildRow(node: UserNode, isAncestor: boolean): ChartRow {
-    const ownBudget   = this.workingDays * (node.dailyHours ?? 8);
-    const ownLogged   = this.ownEntries(node).reduce((s, e) => s + e.hours, 0);
-    const teamBudget  = isAncestor ? 0 : this.subtreeBudget(node) - ownBudget;
-    const teamLogged  = isAncestor ? 0 : this.subtreeLogged(node) - ownLogged;
+    const ownBudget = this.r2(this.workingDays * (node.dailyHours ?? 8));
+    const ownLogged = this.r2(this.ownEntries(node).reduce((s, e) => s + e.hours, 0));
+    const teamBudget = isAncestor ? 0 : this.r2(this.subtreeBudget(node) - ownBudget);
+    const teamLogged = isAncestor ? 0 : this.r2(this.subtreeLogged(node) - ownLogged);
     const totalBudget = ownBudget + teamBudget;
     const totalLogged = ownLogged + teamLogged;
     const totalReporteesCount = this.countAllReportees(node);
@@ -152,6 +152,10 @@ export class HierarchyBarComponent implements OnChanges {
     return own + team;
   }
 
+  private r2(n: number): number {
+    return Math.round(n * 100) / 100;
+  }
+
   private countAllReportees(node: UserNode): number {
     if (!node.directReports || node.directReports.length === 0) {
       return 0;
@@ -166,39 +170,35 @@ export class HierarchyBarComponent implements OnChanges {
   // ── Chart config ─────────────────────────────────────────────────────────
   private buildChart(): void {
     const labels = this.currentRows.map(r => r.name);
-    const totalLogged = this.currentRows.map(r => r.ownLogged + r.teamLogged);
-    const totalBudget = this.currentRows.map(r => r.ownBudget + r.teamBudget);
+    const totalLogged = this.currentRows.map(r => this.r2(r.ownLogged + r.teamLogged));
+    const totalBudget = this.currentRows.map(r => this.r2(r.ownBudget + r.teamBudget));
 
-    // ancestor bar = amber, everyone else = blue
-    const loggedColors = this.currentRows.map(r =>
-      r.isAncestor ? '#f59e0b' : '#2563eb'
-    );
-    const budgetColors = this.currentRows.map(r =>
-      r.isAncestor ? '#fde68a' : '#cbd5e1'
-    );
+    // After totalBudget line, add:
+    const maxVal = Math.max(...totalBudget, 1);
+    const minBar = maxVal * 0.04;
+    const displayLogged = totalLogged.map(v => Math.max(v, minBar));
+    const displayBudget = totalBudget.map(v => Math.max(v, minBar));
+
+    const manyRows = this.currentRows.length > 6;
+    const chartHeight = manyRows ? 420 : 320;
+
+    const loggedColors = this.currentRows.map(r => r.isAncestor ? '#f59e0b' : '#2563eb');
+    const budgetColors = this.currentRows.map(r => r.isAncestor ? '#fde68a' : '#cbd5e1');
 
     this.chartOptions = {
       series: [
         {
           name: 'Logged',
-          data: totalLogged.map((val, i) => ({
-            x: labels[i],
-            y: val,
-            fillColor: loggedColors[i]
-          }))
+          data: displayLogged.map((val, i) => ({ x: labels[i], y: val, fillColor: loggedColors[i] }))
         },
         {
           name: 'Budget',
-          data: totalBudget.map((val, i) => ({
-            x: labels[i],
-            y: val,
-            fillColor: budgetColors[i]
-          }))
+          data: displayBudget.map((val, i) => ({ x: labels[i], y: val, fillColor: budgetColors[i] }))
         }
       ],
       chart: {
         type: 'bar',
-        height: 320,
+        height: chartHeight,
         stacked: false,
         fontFamily: 'Inter, Segoe UI, sans-serif',
         toolbar: { show: false },
@@ -209,33 +209,41 @@ export class HierarchyBarComponent implements OnChanges {
           }
         }
       },
-      colors: ['#2563eb', '#cbd5e1'],   // fallback, overridden per-bar above
+      colors: ['#2563eb', '#cbd5e1'],
       plotOptions: {
         bar: {
           horizontal: false,
-          columnWidth: '52%',
-          borderRadius: 5,
+          columnWidth: manyRows ? '70%' : '52%',
+          borderRadius: 4,
           borderRadiusApplication: 'end',
           distributed: false,
+          dataLabels: { position: 'top' }
         }
       },
       dataLabels: {
         enabled: true,
-        formatter: (val: number) => val > 0 ? `${val}h` : '',
-        style: {
-          fontSize: '11px',
-          fontWeight: 800,
-          colors: ['#fff', '#475569']
-        }
+        formatter: (_val: number, opts: any) => {
+          const real = opts.seriesIndex === 0
+            ? totalLogged[opts.dataPointIndex]
+            : totalBudget[opts.dataPointIndex];
+          return `${this.r2(real)}h`;
+        },
+        style: { fontSize: '11px', fontWeight: 600, colors: ['#64748b', '#64748b'] },
+        background: { enabled: false },
+        offsetY: -20,
+        offsetX: 0,
       },
       stroke: { width: 2, colors: ['#ffffff'] },
       xaxis: {
         categories: labels,
-        labels: { style: { colors: '#475569', fontSize: '12px', fontWeight: 700 } }
+        labels: {
+          rotate: -45,
+          rotateAlways: true,
+          trim: false,
+          style: { colors: '#475569', fontSize: '11px', fontWeight: 600 }
+        }
       },
-      yaxis: {
-        labels: { formatter: (v: number) => `${v}h` }
-      },
+      yaxis: { labels: { formatter: (v: number) => `${v}h` } },
       legend: {
         position: 'top',
         horizontalAlign: 'right',
@@ -247,16 +255,16 @@ export class HierarchyBarComponent implements OnChanges {
       tooltip: {
         custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
           const r = this.currentRows[dataPointIndex];
-          const tl = r.ownLogged + r.teamLogged;
-          const tb = r.ownBudget + r.teamBudget;
+          const tl = this.r2(r.ownLogged + r.teamLogged);
+          const tb = this.r2(r.ownBudget + r.teamBudget);
           return `
-          <div class="chart-tooltip">
-            <strong>${r.name}</strong>
-            <span>${r.designation}</span>
-            <p>Logged: ${tl}h &nbsp;|&nbsp; Budget: ${tb}h</p>
-            <p>Utilization: <b>${r.utilization}%</b></p>
-            ${r.teamBudget > 0 ? `<p style="color:#94a3b8;font-size:11px">Own: ${r.ownLogged}h &nbsp;+&nbsp; Team: ${r.teamLogged}h</p>` : ''}
-          </div>`;
+        <div class="chart-tooltip">
+          <strong>${r.name}</strong>
+          <span>${r.designation}</span>
+          <p>Logged: ${tl}h &nbsp;|&nbsp; Budget: ${tb}h</p>
+          <p>Utilization: <b>${r.utilization}%</b></p>
+          ${r.teamBudget > 0 ? `<p style="color:#94a3b8;font-size:11px">Own: ${this.r2(r.ownLogged)}h &nbsp;+&nbsp; Team: ${this.r2(r.teamLogged)}h</p>` : ''}
+        </div>`;
         }
       },
       annotations: {

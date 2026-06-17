@@ -69,6 +69,7 @@ button:disabled {
 /* ── Chart ── */
 .chart-body {
   min-height: 320px;
+  overflow: hidden;
 }
 
 /* ── Entry section ── */

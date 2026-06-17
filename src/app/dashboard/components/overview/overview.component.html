@@ -79,7 +79,7 @@
         <div class="alert-row" *ngFor="let s of closingThisWeek">
           <div class="alert-dot amber"></div>
           <div class="alert-info">
-            <strong>{{ s.name }}</strong>
+            <strong>{{ s.name + ' (' + s.projectName + ')' }}</strong>
             <span>Due {{ s.endDate }} ·
               <em class="closing-tag">
                 {{ daysUntil(s.endDate) === 0 ? 'Today' : daysUntil(s.endDate) + 'd left' }}

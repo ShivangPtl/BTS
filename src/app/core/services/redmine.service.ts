@@ -20,12 +20,9 @@ export class RedmineService {
   private readonly apiKeyStorageKey = '6d18a984feda82e9a2b028bbe1163f932ccc67a3';
 
   // ── Cache ────────────────────────────────────────────────────────────────
-  private _allVersions:    SprintSummary[] = [];
+  private _allVersions: SprintSummary[] = [];
   private _activeVersions: SprintSummary[] = [];  // only status === 'open'
-  private _allIssues:      any[]           = [];
-  private _activeIssues:   any[]           = [];  // issues scoped to active versions only
-  private _cacheLoaded  = false;
-  isLoading             = false;   // public so dashboard can show loader
+  isLoading = false;   // public so dashboard can show loader
 
   private readonly publicHolidays: PublicHoliday[] = [
     { date: '2026-06-11', name: 'Local Public Holiday', hoursDeducted: 8 },
@@ -203,7 +200,7 @@ export class RedmineService {
       const versionsResult = await this.fetchAllVersions();
 
       // Step 2: Separate active (open) vs non-active versions
-      const allVersionEntries:    { version: any; projectId: number; projectName: string }[] = [];
+      const allVersionEntries: { version: any; projectId: number; projectName: string }[] = [];
       const activeVersionEntries: { version: any; projectId: number; projectName: string }[] = [];
 
       versionsResult.forEach(({ project, versions }) => {
@@ -232,9 +229,6 @@ export class RedmineService {
 
       // Step 5: Active-only views
       this._activeVersions = this._allVersions.filter(s => s.status === 'Active');
-      this._activeIssues   = [].flat();
-      this._allIssues      = this._activeIssues;  // backward compat
-      this._cacheLoaded    = true;
 
     } finally {
       this.isLoading = false;
@@ -344,7 +338,7 @@ export class RedmineService {
     );
   }
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getApiKey(): string {
     return localStorage.getItem(this.apiKeyStorageKey) ?? '';
@@ -371,11 +365,12 @@ export class RedmineService {
       const response = await lastValueFrom(
         this.http.get<{ projects: any[] }>(
           `${this.apiBaseUrl}/projects.json`,
-          { headers: this.getHeaders(),
+          {
+            headers: this.getHeaders(),
             params: {
               limit: 100,
             }
-           }
+          }
         )
       );
 
@@ -387,6 +382,7 @@ export class RedmineService {
       }));
 
       this.projects = projects;
+      await this.loadAllData();
       return { projects };
 
     } catch (error) {
@@ -480,11 +476,6 @@ export class RedmineService {
   }
 
   /** Issues belonging to active sprints only */
-  getActiveIssues(projectId = 'all'): any[] {
-    return projectId === 'all'
-      ? this._activeIssues
-      : this._activeIssues.filter((i: any) => i.project?.id === Number(projectId));
-  }
 
   private mapVersionToSprint(
     version: any,
@@ -510,6 +501,7 @@ export class RedmineService {
       id: version.id,
       versionId: version.id,
       projectId,
+      projectName,
       name: version.name,
       startDate: version.created_on?.slice(0, 10) ?? '',
       endDate: version.due_date ?? '',
@@ -595,65 +587,84 @@ export class RedmineService {
   //     })
   //   );
   // }
+  // REPLACE entire getSpentTime:
+
+  private fetchToken = 0;
+
   async getSpentTime(
     startDate: string,
     endDate: string,
     projectId = 'all'
   ): Promise<TimeEntry[]> {
-    // return from cache if already fetched
-
     this.isLoading = true;
+    const token = ++this.fetchToken;
+
+    const PAGE = 100;
+    const CONCURRENCY = 5;
+
+    const buildParams = (offset: number): any => {
+      const p: any = {
+        limit: PAGE.toString(),
+        offset: offset.toString(),
+        spent_on: `><${startDate}|${endDate}`
+      };
+      if (projectId !== 'all') p['project_id'] = projectId;
+      return p;
+    };
+
+    const mapEntry = (e: any): TimeEntry => ({
+      id: e.id,
+      userId: e.user.id,
+      userName: e.user.name,
+      redmineUserId: e.user.id,
+      projectId: e.project.id,
+      sprintId: e.fixed_version?.id ?? 0,
+      issueId: e.issue?.id ?? 0,
+      issueSubject: e.comments ?? '',
+      issueType: e.activity?.name ?? 'Task',
+      hours: e.hours,
+      spentOn: e.spent_on
+    });
+
+    const fetchPage = (offset: number) => {
+      if (token !== this.fetchToken) return Promise.resolve({ time_entries: [], total_count: 0 });
+      return lastValueFrom(
+        this.http.get<{ time_entries: any[]; total_count: number }>(
+          `${this.apiBaseUrl}/time_entries.json`,
+          { headers: this.getHeaders(), params: buildParams(offset) }
+        )
+      ).catch(() => ({ time_entries: [], total_count: 0 }));
+    };
 
     try {
-      const PAGE = 100;
-      const result: TimeEntry[] = [];
-      let offset = 0;
-      let total = Infinity;
+      const first = await fetchPage(0);
+      if (token !== this.fetchToken) return [];
 
-      while (offset < total) {
-        const params: any = {
-          limit: PAGE.toString(),
-          offset: offset.toString(),
-          spent_on: `><${startDate}|${endDate}`
-        };
+      const total = first.total_count;
+      const results = (first.time_entries ?? []).map(mapEntry);
 
-        if (projectId !== 'all') {
-          params['project_id'] = projectId;
-        }
-
-        const res = await lastValueFrom(
-          this.http.get<{ time_entries: any[]; total_count: number }>(
-            `${this.apiBaseUrl}/time_entries.json`,
-            { headers: this.getHeaders(), params }
-          )
+      if (total > PAGE) {
+        const offsets = Array.from(
+          { length: Math.ceil((total - PAGE) / PAGE) },
+          (_, i) => (i + 1) * PAGE
         );
 
-        result.push(...(res.time_entries ?? []).map((e: any) => ({
-          id: e.id,
-          userId: e.user.id,
-          userName: e.user.name,
-          redmineUserId: e.user.id,
-          projectId: e.project.id,
-          sprintId: e.fixed_version?.id ?? 0,
-          issueId: e.issue?.id ?? 0,
-          issueSubject: e.comments ?? '',
-          issueType: e.activity?.name ?? 'Task',
-          hours: e.hours,
-          spentOn: e.spent_on
-        })));
-
-        total = res.total_count;
-        offset += PAGE;
-
-        if (result.length >= 2000) break;  // safety cap per range
+        for (let i = 0; i < offsets.length; i += CONCURRENCY) {
+          if (token !== this.fetchToken) return [];  // abort mid-batch
+          const batch = offsets.slice(i, i + CONCURRENCY);
+          const pages = await Promise.all(batch.map(fetchPage));
+          pages.forEach(p => results.push(...(p.time_entries ?? []).map(mapEntry)));
+        }
       }
-      return result;
+
+      if (token !== this.fetchToken) return [];
+      return results;
 
     } catch (err) {
       console.warn('Time entries fetch failed', err);
       return [];
     } finally {
-      this.isLoading = false;
+      if (token === this.fetchToken) this.isLoading = false;
     }
   }
 
@@ -718,8 +729,8 @@ export class RedmineService {
 
   sumHours(entries: TimeEntry[]): number {
 
-  return entries.reduce((sum, entry) => sum + entry.hours, 0);
-}
+    return entries.reduce((sum, entry) => sum + entry.hours, 0);
+  }
 
   private countWeekdays(startDate: string, endDate: string): number {
     let count = 0;

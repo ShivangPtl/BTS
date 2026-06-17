@@ -23,6 +23,7 @@ export interface SprintSummary {
   id: number;
   versionId: any;
   projectId: number;
+  projectName: string;
   name: string;
   startDate: string;
   endDate: string;
