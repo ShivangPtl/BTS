@@ -36,6 +36,13 @@ export class NavbarComponent implements OnInit {
   @Output() selectedViewChange = new EventEmitter<AppView>();
   @Output() filterChange = new EventEmitter<void>();
 
+  // ── Sprint-specific filters ──
+  @Input()  sprintSearch = '';
+  @Output() sprintSearchChange = new EventEmitter<string>();
+
+  @Input()  sprintStatus = 'all';
+  @Output() sprintStatusChange = new EventEmitter<string>();
+
   // ── Presets ──
   activePreset: DatePreset = 'this-month';
   presets: { key: DatePreset; label: string }[] = [
@@ -64,9 +71,7 @@ export class NavbarComponent implements OnInit {
   navItems: { key: AppView; label: string }[] = [
     { key: 'overview',    label: 'Overview' },
     { key: 'utilization', label: 'Utilization' },
-    // { key: 'sprints',     label: 'Sprints' },
-    // { key: 'issues',      label: 'Issues' },
-    // { key: 'admin',       label: 'Admin' },
+    { key: 'sprints',     label: 'Sprints' },
   ];
 
   ngOnInit(): void {
@@ -79,11 +84,31 @@ export class NavbarComponent implements OnInit {
     this.viewMonth = d.getMonth();
   }
 
+  // ── Sprint filter helpers ──
+  get isSprints(): boolean { return this.selectedView === 'sprints'; }
+
+  onSprintSearchChange(val: string): void {
+    this.sprintSearch = val;
+    this.sprintSearchChange.emit(val);
+    this.filterChange.emit();
+  }
+
+  clearSprintSearch(): void {
+    this.sprintSearch = '';
+    this.sprintSearchChange.emit('');
+    this.filterChange.emit();
+  }
+
+  onSprintStatusChange(status: string): void {
+    this.sprintStatus = status;
+    this.sprintStatusChange.emit(status);
+    this.filterChange.emit();
+  }
+
   // ── Preset handling ──
   applyPreset(key: DatePreset): void {
     this.activePreset = key;
     if (key === 'custom') {
-      // Stay open, reset pending so user can pick fresh
       this.pendingStart = null;
       this.pendingEnd   = null;
       this.hoverDate    = null;
@@ -99,11 +124,7 @@ export class NavbarComponent implements OnInit {
 
   // ── Picker open/close ──
   togglePicker(): void {
-    if (this.pickerOpen) {
-      this.closePicker();
-    } else {
-      this.openPicker();
-    }
+    if (this.pickerOpen) { this.closePicker(); } else { this.openPicker(); }
   }
 
   openPicker(): void {
@@ -119,14 +140,12 @@ export class NavbarComponent implements OnInit {
     }
   }
 
-  // Called by clickOutside directive — only close if picker is open
   closepicker(): void { this.closePicker(); }
   closePicker(): void { this.pickerOpen = false; }
 
   @HostListener('document:keydown.escape')
   onEsc(): void { this.pickerOpen = false; }
 
-  // ── Calendar navigation ──
   shiftMonth(delta: number): void {
     this.viewMonth += delta;
     if (this.viewMonth > 11) { this.viewMonth = 0;  this.viewYear++; }
@@ -147,17 +166,14 @@ export class NavbarComponent implements OnInit {
     return this.buildCells(y, m);
   }
 
-  // ── Day selection — simple two-click: first=start, second=end ──
   selectDay(date: string): void {
     if (!this.selectingEnd) {
-      // First click: set start, switch to custom immediately
       this.pendingStart = date;
       this.pendingEnd   = null;
       this.hoverDate    = null;
       this.selectingEnd = true;
       this.activePreset = 'custom';
     } else {
-      // Second click: set end (swap if needed)
       if (date < this.pendingStart!) {
         this.pendingEnd   = this.pendingStart;
         this.pendingStart = date;
@@ -184,14 +200,13 @@ export class NavbarComponent implements OnInit {
     this.pickerOpen = false;
   }
 
-  // ── Cell state helpers ──
   isStart(date: string): boolean {
     if (this.pendingStart) return date === this.pendingStart;
     return date === this.startDate;
   }
 
   isEnd(date: string): boolean {
-    if (this.selectingEnd) return false;           // still picking end — no end highlight yet
+    if (this.selectingEnd) return false;
     if (this.pendingEnd)   return date === this.pendingEnd;
     return date === this.endDate;
   }
@@ -215,11 +230,10 @@ export class NavbarComponent implements OnInit {
     return '';
   }
 
-  // ── Calendar cell builder ──
   private buildCells(year: number, month: number): CalCell[] {
     const first    = new Date(year, month, 1);
     const lastDay  = new Date(year, month + 1, 0).getDate();
-    const startDow = (first.getDay() + 6) % 7; // Monday-first
+    const startDow = (first.getDay() + 6) % 7;
     const cells: CalCell[] = [];
     for (let i = 0; i < startDow; i++) cells.push({ date: null, label: '' });
     for (let d = 1; d <= lastDay; d++) {
@@ -235,14 +249,11 @@ export class NavbarComponent implements OnInit {
 
   private fmt(d: Date): string { return d.toISOString().slice(0, 10); }
 
-  // ── Preset range calc ──
   private getPresetRange(key: DatePreset): { start: string; end: string } {
     const today = new Date();
     const fmt   = (d: Date) => d.toISOString().slice(0, 10);
-
     switch (key) {
       case 'this-week': {
-        // Monday of current week → today
         const day = today.getDay();
         const mon = new Date(today);
         mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
@@ -266,10 +277,7 @@ export class NavbarComponent implements OnInit {
         return { start: fmt(s), end: fmt(e) };
       }
       case 'this-year': {
-        return {
-          start: fmt(new Date(today.getFullYear(), 0, 1)),
-          end:   fmt(new Date(today.getFullYear(), 11, 31))
-        };
+        return { start: fmt(new Date(today.getFullYear(), 0, 1)), end: fmt(new Date(today.getFullYear(), 11, 31)) };
       }
       default:
         return { start: fmt(today), end: fmt(today) };

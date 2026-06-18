@@ -76,7 +76,7 @@ export class OverviewComponent implements OnChanges {
       .slice(0, 6);
 
     this.closingThisWeek = this.sprints
-      .filter(s => s.endDate && s.endDate >= today && s.endDate <= in7)
+      .filter(s => s.endDate && s.endDate >= today)
       .sort((a, b) => a.endDate.localeCompare(b.endDate));
 
     // ── Project health ───────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export class OverviewComponent implements OnChanges {
         activeCount:     ps.length,
         openIssues:      ps.reduce((s, x) => s + x.openIssues, 0),
         overdueSprints:  ps.filter(s => s.endDate && s.endDate < today).length,
-        closingSoon:     ps.filter(s => s.endDate >= today && s.endDate <= in7).length
+        closingSoon:     ps.filter(s => s.endDate >= today).length
       };
     }).filter(p => p.activeCount > 0);   // only projects with active sprints
 
