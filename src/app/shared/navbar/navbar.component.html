@@ -96,6 +96,8 @@
                 [class.range-start]="cell.date && isStart(cell.date)"
                 [class.range-end]="cell.date && isEnd(cell.date)"
                 [class.today]="cell.date && isToday(cell.date)"
+                [class.holiday]="cell.date && getHoliday(cell.date)"
+                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
                 (click)="cell.date && selectDay(cell.date)">
                 {{ cell.label }}
               </span>
@@ -121,6 +123,8 @@
                 [class.range-start]="cell.date && isStart(cell.date)"
                 [class.range-end]="cell.date && isEnd(cell.date)"
                 [class.today]="cell.date && isToday(cell.date)"
+                [class.holiday]="cell.date && getHoliday(cell.date)"
+                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
                 (click)="cell.date && selectDay(cell.date)">
                 {{ cell.label }}
               </span>

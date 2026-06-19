@@ -179,6 +179,11 @@ export class DashboardComponent implements OnInit {
     this.holidays  = holidays;
     this.isLoading = false;
 
+    console.log('Dashboard data loaded:', {
+      projects: this.projects,
+      hierarchy: this.hierarchy,
+      holidays: this.holidays
+    });
     this.fetchFilteredData();
   }
 
@@ -206,7 +211,7 @@ export class DashboardComponent implements OnInit {
 
   refreshDerivedData(): void {
     this.applyAccessFilter();
-    this.capacity = this.redmineService.calculateCapacity(this.startDate, this.endDate, this.hierarchy, this.timeEntries);
+    this.capacity = this.redmineService.calculateCapacity(this.startDate, this.endDate, this.hierarchy, this.timeEntries, this.holidays);
     this.kpiCards = this.buildKpis();
     this.projectRollups = this.buildProjectRollups();
     this.timesheetGaps = this.buildTimesheetGaps();
@@ -244,7 +249,7 @@ export class DashboardComponent implements OnInit {
   }
 
   get visibleHolidays(): PublicHoliday[] {
-    return this.redmineService.getHolidaysInRange(this.startDate, this.endDate);
+    return this.redmineService.getHolidaysInRange(this.startDate, this.endDate, this.holidays);
   }
 
   get enabledWidgetCount(): number {

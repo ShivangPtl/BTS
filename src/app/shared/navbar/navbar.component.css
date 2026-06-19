@@ -561,3 +561,23 @@
 
 .cal-apply:hover:not(:disabled) { background: #1d4ed8; }
 .cal-apply:disabled { opacity: 0.35; cursor: not-allowed; }
+
+
+.cal-cell.holiday {
+  color: var(--accent, #e67e22);
+  font-weight: 600;
+}
+
+.holiday-dot {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent, #e67e22);
+  margin: 1px auto 0;
+}
+
+/* today + holiday together */
+.cal-cell.today.holiday {
+  outline-color: var(--accent, #e67e22);
+}
