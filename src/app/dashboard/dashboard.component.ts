@@ -19,6 +19,7 @@ import {
   UserNode,
   WidgetDefinition
 } from './dashboard.model';
+import { SprintsComponent } from './components/sprints/sprints.component';
 
 interface KpiCard {
   label: string;
@@ -46,7 +47,7 @@ interface TimesheetGap {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgApexchartsModule, HierarchyBarComponent, NavbarComponent, OverviewComponent],
+  imports: [CommonModule, FormsModule, NgApexchartsModule, HierarchyBarComponent, NavbarComponent, OverviewComponent, SprintsComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -54,6 +55,7 @@ export class DashboardComponent implements OnInit {
   hierarchy: UserNode[] = [];
   projects: RedmineProject[] = [];
   sprints: SprintSummary[] = [];
+  allSprints: SprintSummary[] = [];  // all statuses — used by Sprints page
   timeEntries: TimeEntry[] = [];
   holidays: PublicHoliday[] = [];
   widgets: WidgetDefinition[] = [];
@@ -196,6 +198,8 @@ export class DashboardComponent implements OnInit {
   async fetchFilteredData(): Promise<void> {
     // Active sprints only — instant from cache, no closed/planned noise
     this.sprints = this.redmineService.getActiveSprints(this.selectedProjectId);
+    // All sprints (Active + Planned + Closed) — for the Sprints page
+    this.allSprints = this.redmineService.getSprints(this.selectedProjectId);
 
     // time entries — fetched by date range, scoped to active sprint date window
     this.isLoading = true;

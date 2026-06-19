@@ -176,35 +176,10 @@
 
     <!-- ══ SPRINTS ══ -->
     @if (selectedView === 'sprints') {
-      <section class="panel">
-        <div class="panel-header compact">
-          <div>
-            <span class="panel-kicker">Sprint-wise</span>
-            <h2>Sprint health</h2>
-          </div>
-        </div>
-        <div class="data-table">
-          <div class="table-row head">
-            <span>Sprint</span>
-            <span>Status</span>
-            <span>Issues</span>
-            <span>Open</span>
-            <span>Bug / CR / Story</span>
-            <span>Logged</span>
-          </div>
-          <div class="table-row" *ngFor="let sprint of sprints">
-            <span>
-              <strong>{{ sprint.name }}</strong>
-              <small>{{ sprint.startDate }} to {{ sprint.endDate }}</small>
-            </span>
-            <span><mark>{{ sprint.status }}</mark></span>
-            <span>{{ sprint.totalIssues }}</span>
-            <span>{{ sprint.openIssues }}</span>
-            <span>{{ sprint.bugs }} / {{ sprint.crs }} / {{ sprint.stories }}</span>
-            <span>{{ sprint.loggedHours }}h</span>
-          </div>
-        </div>
-      </section>
+      <app-sprints
+        [sprints]="allSprints"
+        [projects]="projects">
+      </app-sprints>
     }
 
     <!-- ══ ADMIN ══ -->

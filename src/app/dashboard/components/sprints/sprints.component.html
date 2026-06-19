@@ -1,0 +1,366 @@
+<div class="sprints-page">
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LEVEL 1 — SPRINT LIST
+  ════════════════════════════════════════════════════════════════════════ -->
+  @if (drillState.level === 'list') {
+
+    <!-- Result count -->
+    <div class="page-meta">
+      <span class="result-count">{{ filteredSprints.length }} sprint{{ filteredSprints.length !== 1 ? 's' : '' }}</span>
+    </div>
+
+    <div class="sprint-list" *ngIf="filteredSprints.length; else emptyState">
+      <div
+        class="sprint-card"
+        *ngFor="let sprint of filteredSprints; trackBy: trackBySprintId"
+        [class.sprint-overdue]="isOverdue(sprint)"
+        (click)="openSprint(sprint)">
+
+        <!-- Status dot + identity -->
+        <div class="sprint-identity">
+          <div class="status-dot" [ngClass]="statusTone(sprint.status)"></div>
+          <div class="sprint-name-block">
+            <span class="sprint-name">{{ sprint.name }}</span>
+            <span class="sprint-project">{{ sprint.projectName }}</span>
+          </div>
+        </div>
+
+        <!-- Dates -->
+        <div class="sprint-dates">
+          <span *ngIf="sprint.startDate">{{ sprint.startDate | date:'dd MMM' }}</span>
+          <span class="date-arrow" *ngIf="sprint.startDate && sprint.endDate">→</span>
+          <span *ngIf="sprint.endDate">{{ sprint.endDate | date:'dd MMM yyyy' }}</span>
+          <span class="overdue-tag" *ngIf="isOverdue(sprint)">{{ daysUntil(sprint.endDate) * -1 }}d overdue</span>
+          <span class="due-soon-tag" *ngIf="!isOverdue(sprint) && sprint.endDate && daysUntil(sprint.endDate) <= 3 && sprint.status === 'Active'">due in {{ daysUntil(sprint.endDate) }}d</span>
+        </div>
+
+        <!-- KPIs -->
+        <div class="sprint-kpis">
+          <div class="kpi-chip"><span class="kv">{{ sprint.totalIssues }}</span><span class="kl">Total</span></div>
+          <div class="kpi-chip"><span class="kv">{{ sprint.openIssues }}</span><span class="kl">Open</span></div>
+          <div class="kpi-chip kpi-bug"><span class="kv">{{ sprint.bugs }}</span><span class="kl">Bugs</span></div>
+          <div class="kpi-chip"><span class="kv">{{ sprint.crs }}</span><span class="kl">CRs</span></div>
+          <div class="kpi-chip"><span class="kv">{{ sprint.stories }}</span><span class="kl">Stories</span></div>
+
+          <div class="mini-progress-wrap">
+            <div class="mini-progress-bar"><div class="mini-progress-fill" [style.width.%]="progressPct(sprint)"></div></div>
+            <span class="mini-pct">{{ progressPct(sprint) }}%</span>
+          </div>
+
+          <span class="status-badge" [ngClass]="statusTone(sprint.status)">{{ sprint.status }}</span>
+        </div>
+
+        <!-- Drill arrow -->
+        <div class="drill-arrow">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #emptyState>
+      <div class="empty-state">
+        <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3 9.5h18" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7.5 3v3M16.5 3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <strong>No sprints found</strong>
+        <span>Try adjusting the filters above.</span>
+      </div>
+    </ng-template>
+  }
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LEVEL 2 — SPRINT DETAIL
+  ════════════════════════════════════════════════════════════════════════ -->
+  @if (drillState.level === 'sprint-detail' && drillState.sprint) {
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb-bar">
+      <button class="bc-btn" (click)="goToList()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        All Sprints
+      </button>
+      <span class="bc-sep">›</span>
+      <span class="bc-current">{{ drillState.sprint.name }}</span>
+    </div>
+
+    <!-- Sprint header card -->
+    <div class="detail-header-card">
+      <div class="dh-left">
+        <div class="status-dot large" [ngClass]="statusTone(drillState.sprint.status)"></div>
+        <div>
+          <h2 class="dh-title">{{ drillState.sprint.name }}</h2>
+          <span class="dh-project">{{ drillState.sprint.projectName }}</span>
+        </div>
+      </div>
+      <div class="dh-meta">
+        <div class="dh-meta-item" *ngIf="drillState.sprint.startDate">
+          <span class="dm-label">Start</span>
+          <span class="dm-val">{{ drillState.sprint.startDate | date:'dd MMM yyyy' }}</span>
+        </div>
+        <div class="dh-meta-item" *ngIf="drillState.sprint.endDate">
+          <span class="dm-label">End</span>
+          <span class="dm-val" [class.overdue-text]="isOverdue(drillState.sprint)">{{ drillState.sprint.endDate | date:'dd MMM yyyy' }}</span>
+        </div>
+        <span class="status-badge large" [ngClass]="statusTone(drillState.sprint.status)">{{ drillState.sprint.status }}</span>
+        <span class="overdue-tag" *ngIf="isOverdue(drillState.sprint)">{{ daysUntil(drillState.sprint.endDate) * -1 }}d overdue</span>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    @if (currentDetail?.loading) {
+      <div class="detail-loading">
+        <div class="loading-spinner"></div>
+        <span>Loading sprint issues from Redmine…</span>
+      </div>
+    }
+
+    @if (currentDetail && !currentDetail.loading) {
+
+      @if (currentDetail.error) {
+        <div class="detail-error">{{ currentDetail.error }}</div>
+      }
+
+      @if (!currentDetail.error) {
+
+        <!-- ── STATUS OVERVIEW (top KPI row) ── -->
+        <div class="status-overview-row">
+          <div
+            class="status-kpi-card"
+            *ngFor="let ss of currentDetail.statusSummary"
+            [style.borderTopColor]="ss.color"
+            (click)="openIssueList('status', ss.group, ss.label)">
+            <span class="skc-label">{{ ss.label }}</span>
+            <span class="skc-count" [style.color]="ss.color">{{ ss.count }}</span>
+            <span class="skc-hint">View issues</span>
+          </div>
+        </div>
+
+        <!-- ── ISSUE TYPE BREAKDOWN ── -->
+        <div class="section-panel">
+          <div class="section-panel-header">
+            <h3 class="sp-title">Issue Types</h3>
+            <span class="sp-hint">Click any type to drill into its issues</span>
+          </div>
+
+          <div class="tracker-grid">
+            <div
+              class="tracker-card"
+              *ngFor="let tg of currentDetail.trackerGroups"
+              (click)="openIssueList('tracker', tg.name, tg.name + ' Issues')">
+
+              <div class="tc-header">
+                <span class="tc-swatch" [style.background]="tg.color">{{ tg.icon }}</span>
+                <span class="tc-name">{{ tg.name }}</span>
+                <span class="tc-total" [style.color]="tg.color">{{ tg.count }}</span>
+              </div>
+
+              <!-- Status mini-bar breakdown -->
+              <div class="tc-status-strip">
+                <div class="tcs-seg seg-new"        [style.flex]="tg.new"        *ngIf="tg.new"        title="{{ tg.new }} New"></div>
+                <div class="tcs-seg seg-inprogress" [style.flex]="tg.inprogress" *ngIf="tg.inprogress" title="{{ tg.inprogress }} In Progress"></div>
+                <div class="tcs-seg seg-resolved"   [style.flex]="tg.resolved"   *ngIf="tg.resolved"   title="{{ tg.resolved }} Resolved"></div>
+                <div class="tcs-seg seg-closed"     [style.flex]="tg.closed"     *ngIf="tg.closed"     title="{{ tg.closed }} Closed"></div>
+                <div class="tcs-seg seg-rejected"   [style.flex]="tg.rejected"   *ngIf="tg.rejected"   title="{{ tg.rejected }} Rejected"></div>
+              </div>
+
+              <div class="tc-status-summary">
+                <span *ngIf="tg.new"><i class="dot new"></i>{{ tg.new }} New</span>
+                <span *ngIf="tg.inprogress"><i class="dot ip"></i>{{ tg.inprogress }} In Progress</span>
+                <span *ngIf="tg.resolved"><i class="dot rv"></i>{{ tg.resolved }} Resolved</span>
+                <span *ngIf="tg.closed"><i class="dot cl"></i>{{ tg.closed }} Closed</span>
+                <span *ngIf="tg.rejected"><i class="dot rj"></i>{{ tg.rejected }} Rejected</span>
+              </div>
+            </div>
+
+            @if (!currentDetail.trackerGroups.length) {
+              <div class="no-data-hint">No issues found for this sprint.</div>
+            }
+          </div>
+        </div>
+
+        <!-- ── TEAM WORKLOAD ── -->
+        @if (currentDetail.memberLoads.length) {
+          <div class="section-panel">
+            <div class="section-panel-header">
+              <h3 class="sp-title">Team Workload at a Glance</h3>
+              <span class="sp-hint">Click a member to see their issues</span>
+            </div>
+
+            <div class="member-grid">
+              <div
+                class="member-card"
+                *ngFor="let m of currentDetail.memberLoads"
+                (click)="openIssueList('member', m.name, m.name + '\'s Issues')">
+
+                <div class="mc-top">
+                  <div class="member-avatar">{{ m.name | slice:0:2 | uppercase }}</div>
+                  <div class="mc-name-block">
+                    <span class="mc-name">{{ m.name }}</span>
+                    <span class="mc-total">{{ m.total }} issues</span>
+                  </div>
+                </div>
+
+                <!-- Status mini-bar breakdown -->
+                <div class="tc-status-strip">
+                  <div class="tcs-seg seg-new"        [style.flex]="m.new"        *ngIf="m.new"        title="{{ m.new }} New"></div>
+                  <div class="tcs-seg seg-inprogress" [style.flex]="m.inprogress" *ngIf="m.inprogress" title="{{ m.inprogress }} In Progress"></div>
+                  <div class="tcs-seg seg-resolved"   [style.flex]="m.resolved"   *ngIf="m.resolved"   title="{{ m.resolved }} Resolved"></div>
+                  <div class="tcs-seg seg-closed"     [style.flex]="m.closed"     *ngIf="m.closed"     title="{{ m.closed }} Closed"></div>
+                  <div class="tcs-seg seg-rejected"   [style.flex]="m.rejected"   *ngIf="m.rejected"   title="{{ m.rejected }} Rejected"></div>
+                </div>
+
+                <!-- Status summary -->
+                <div class="mc-status-summary">
+                  <span *ngIf="m.new"><i class="dot new"></i>{{ m.new }} New</span>
+                  <span *ngIf="m.inprogress"><i class="dot ip"></i>{{ m.inprogress }} In Progress</span>
+                  <span *ngIf="m.resolved"><i class="dot rv"></i>{{ m.resolved }} Resolved</span>
+                  <span *ngIf="m.closed"><i class="dot cl"></i>{{ m.closed }} Closed</span>
+                  <span *ngIf="m.rejected"><i class="dot rj"></i>{{ m.rejected }} Rejected</span>
+                </div>
+
+                <!-- Tracker breakdown -->
+                <div class="mc-trackers">
+                  <span class="mc-tracker-item" *ngFor="let t of memberTrackerKeys(m); let last = last">
+                    {{ t }}: <strong [style.color]="trackerColor(t)">{{ m.trackers[t] }}</strong><span class="mc-tracker-sep" *ngIf="!last"> · </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+      }
+    }
+  }
+
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LEVEL 3 — ISSUE LIST (filtered by tracker / status / member)
+  ════════════════════════════════════════════════════════════════════════ -->
+  @if (drillState.level === 'issue-list' && drillState.sprint) {
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb-bar">
+      <button class="bc-btn" (click)="goToList()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        All Sprints
+      </button>
+      <span class="bc-sep">›</span>
+      <button class="bc-btn" (click)="backToSprintDetail()">{{ drillState.sprint.name }}</button>
+      <span class="bc-sep">›</span>
+      <span class="bc-current">{{ drillState.filterLabel }}</span>
+    </div>
+
+    <!-- Issue list header -->
+    <div class="issue-list-header">
+      <div class="ilh-left">
+        <button class="back-btn" (click)="backToSprintDetail()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back
+        </button>
+        <h3 class="ilh-title">{{ drillState.filterLabel }}</h3>
+        <span class="ilh-count">{{ filteredIssues.length }} issue{{ filteredIssues.length !== 1 ? 's' : '' }}</span>
+      </div>
+      <div class="ilh-right">
+        <span class="ilh-sprint">{{ drillState.sprint.name }} · {{ drillState.sprint.projectName }}</span>
+        <button
+          class="group-toggle-btn"
+          *ngIf="drillState.filterType !== 'member'"
+          [class.active]="groupByUser"
+          (click)="toggleGroupByUser()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="11" cy="5" r="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M2.5 13c0-1.8 1.5-3 3.5-3s3.5 1.2 3.5 3M8.5 13c0-1.8 1.5-3 3.5-3s3.5 1.2 3.5 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          Group by Assignee
+        </button>
+      </div>
+    </div>
+
+    <!-- Issue table -->
+    <div class="issue-table-wrap">
+      <div class="issue-table" [class.grouped]="groupByUser">
+        <div class="issue-head">
+          <span class="col-id">#ID</span>
+          <span class="col-subject">Subject</span>
+          <span class="col-type">Type</span>
+          <span class="col-status">Status</span>
+          <span class="col-priority">Priority</span>
+          <span class="col-assignee" *ngIf="!groupByUser">Assignee</span>
+          <span class="col-due">Due Date</span>
+          <span class="col-done">Done %</span>
+          <span class="col-est">Est.h</span>
+        </div>
+
+        <!-- Flat list -->
+        <ng-container *ngIf="!groupByUser">
+          <ng-container *ngFor="let iss of filteredIssues; trackBy: trackByIssueId">
+            <ng-container *ngTemplateOutlet="issueRowTpl; context: { $implicit: iss }"></ng-container>
+          </ng-container>
+        </ng-container>
+
+        <!-- Grouped by assignee -->
+        <ng-container *ngIf="groupByUser">
+          <ng-container *ngFor="let grp of groupedIssues">
+            <div class="group-header-row">
+              <div class="ghr-avatar">{{ grp.assignee | slice:0:2 | uppercase }}</div>
+              <span class="ghr-name">{{ grp.assignee }}</span>
+              <span class="ghr-count">{{ grp.issues.length }} issue{{ grp.issues.length !== 1 ? 's' : '' }}</span>
+            </div>
+            <ng-container *ngFor="let iss of grp.issues; trackBy: trackByIssueId">
+              <ng-container *ngTemplateOutlet="issueRowTpl; context: { $implicit: iss }"></ng-container>
+            </ng-container>
+          </ng-container>
+        </ng-container>
+
+        @if (!filteredIssues.length) {
+          <div class="no-issues-row">No issues found for this filter.</div>
+        }
+      </div>
+    </div>
+
+    <!-- Reusable issue row -->
+    <ng-template #issueRowTpl let-iss>
+      <div class="issue-row" [ngClass]="issueStatusClass(iss.statusGroup)">
+        <span class="col-id">
+          <a class="issue-link" [href]="'http://redmine.yourdomain.com/issues/' + iss.id" target="_blank">#{{ iss.id }}</a>
+        </span>
+        <span class="col-subject" [title]="iss.subject">{{ iss.subject }}</span>
+        <span class="col-type">
+          <span class="type-chip"
+            [style.background]="trackerColor(iss.tracker) + '14'"
+            [style.color]="trackerColor(iss.tracker)"
+            [style.borderColor]="trackerColor(iss.tracker) + '33'">
+            {{ iss.tracker }}
+          </span>
+        </span>
+        <span class="col-status">
+          <span class="status-chip" [ngClass]="issueStatusClass(iss.statusGroup)">{{ iss.status }}</span>
+        </span>
+        <span class="col-priority">
+          <span class="priority-dot" [ngClass]="priorityClass(iss.priority)"></span>
+          {{ iss.priority }}
+        </span>
+        <span class="col-assignee" *ngIf="!groupByUser">{{ iss.assignee }}</span>
+        <span class="col-due" [class.overdue-text]="iss.dueDate && iss.statusGroup !== 'closed' && iss.dueDate < ('' | date:'yyyy-MM-dd')!">
+          {{ iss.dueDate ? (iss.dueDate | date:'dd MMM') : '—' }}
+        </span>
+        <span class="col-done">
+          <div class="done-wrap">
+            <div class="done-bar"><div class="done-fill" [style.width.%]="iss.doneRatio" [ngClass]="issueStatusClass(iss.statusGroup)"></div></div>
+            <span>{{ iss.doneRatio }}%</span>
+          </div>
+        </span>
+        <span class="col-est">{{ iss.estimatedHours || '—' }}</span>
+      </div>
+    </ng-template>
+  }
+
+</div>
