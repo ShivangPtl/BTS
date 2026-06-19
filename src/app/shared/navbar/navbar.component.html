@@ -31,7 +31,6 @@
   </div>
 
   <div class="topnav-filters">
-    <!-- Project filter — always visible -->
     <div class="filter-group">
       <span class="filter-label">Project</span>
       <select [(ngModel)]="selectedProjectId" (change)="this.selectedProjectIdChange.emit(selectedProjectId); filterChange.emit()">
@@ -42,7 +41,6 @@
 
     <div class="filter-sep"></div>
 
-    <!-- ══ DATE PICKER — hidden on Sprints view ══ -->
     <ng-container *ngIf="!isSprints">
       <div class="range-picker-wrap" (clickOutside)="closepicker()">
         <button class="range-trigger" type="button" (click)="togglePicker()">
@@ -88,12 +86,16 @@
                   [class.range-start]="cell.date && isStart(cell.date)"
                   [class.range-end]="cell.date && isEnd(cell.date)"
                   [class.today]="cell.date && isToday(cell.date)"
+                  [class.holiday]="cell.date && getHoliday(cell.date)"
+                  [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
                   (click)="cell.date && selectDay(cell.date)">
                   {{ cell.label }}
                 </span>
               </div>
             </div>
+            
             <div class="cal-month-divider"></div>
+            
             <div class="cal-month">
               <div class="cal-header">
                 <div class="cal-nav-spacer"></div>
@@ -110,27 +112,15 @@
                   [class.range-start]="cell.date && isStart(cell.date)"
                   [class.range-end]="cell.date && isEnd(cell.date)"
                   [class.today]="cell.date && isToday(cell.date)"
+                  [class.holiday]="cell.date && getHoliday(cell.date)"
+                  [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
                   (click)="cell.date && selectDay(cell.date)">
                   {{ cell.label }}
                 </span>
               </div>
-            <div class="cal-grid">
-              <span class="cal-dow" *ngFor="let d of dow">{{ d }}</span>
-              <span
-                *ngFor="let cell of leftCells"
-                class="cal-cell"
-                [class.empty]="!cell.date"
-                [class.in-range]="cell.date && isInRange(cell.date)"
-                [class.range-start]="cell.date && isStart(cell.date)"
-                [class.range-end]="cell.date && isEnd(cell.date)"
-                [class.today]="cell.date && isToday(cell.date)"
-                [class.holiday]="cell.date && getHoliday(cell.date)"
-                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
-                (click)="cell.date && selectDay(cell.date)">
-                {{ cell.label }}
-              </span>
             </div>
           </div>
+          
           <div class="cal-footer">
             <span class="cal-range-text">{{ selectionHint }}</span>
             <button type="button" class="cal-apply" (click)="applyCustomRange()" [disabled]="!pendingStart || !pendingEnd">Apply</button>
@@ -141,9 +131,7 @@
       <div class="filter-sep"></div>
     </ng-container>
 
-    <!-- ══ SPRINT-ONLY FILTERS ══ -->
     <ng-container *ngIf="isSprints">
-      <!-- Search -->
       <div class="sprint-search-wrap">
         <svg class="sprint-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="none">
           <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
@@ -157,34 +145,9 @@
           (ngModelChange)="onSprintSearchChange($event)">
         <button *ngIf="sprintSearch" class="sprint-search-clear" type="button" (click)="clearSprintSearch()">✕</button>
       </div>
-          <!-- Right month -->
-          <div class="cal-month">
-            <div class="cal-header">
-              <div class="cal-nav-spacer"></div>
-              <span>{{ rightMonthLabel }}</span>
-              <button type="button" class="cal-nav-btn" (click)="shiftMonth(1)">›</button>
-            </div>
-            <div class="cal-grid">
-              <span class="cal-dow" *ngFor="let d of dow">{{ d }}</span>
-              <span
-                *ngFor="let cell of rightCells"
-                class="cal-cell"
-                [class.empty]="!cell.date"
-                [class.in-range]="cell.date && isInRange(cell.date)"
-                [class.range-start]="cell.date && isStart(cell.date)"
-                [class.range-end]="cell.date && isEnd(cell.date)"
-                [class.today]="cell.date && isToday(cell.date)"
-                [class.holiday]="cell.date && getHoliday(cell.date)"
-                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
-                (click)="cell.date && selectDay(cell.date)">
-                {{ cell.label }}
-              </span>
-            </div>
-          </div>
 
       <div class="filter-sep"></div>
 
-      <!-- Status pills -->
       <div class="sprint-status-pills">
         <button class="sprint-pill" [class.sprint-pill-active]="sprintStatus === 'all'"      (click)="onSprintStatusChange('all')"     type="button">All</button>
         <button class="sprint-pill sprint-pill-green" [class.sprint-pill-active]="sprintStatus === 'Active'"   (click)="onSprintStatusChange('Active')"  type="button">Active</button>
