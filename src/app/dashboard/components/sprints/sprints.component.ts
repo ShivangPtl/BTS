@@ -160,7 +160,7 @@ export class SprintsComponent implements OnChanges, OnInit {
   // ── Issue list view options ────────────────────────────────────────────
   groupByUser = false;
 
-  private readonly apiBaseUrl = '/redmine-api';
+  apiBaseUrl = '/redmine-api';
 
   constructor(private redmineService: RedmineService, private http: HttpClient) {}
 

@@ -330,7 +330,7 @@
     <ng-template #issueRowTpl let-iss>
       <div class="issue-row" [ngClass]="issueStatusClass(iss.statusGroup)">
         <span class="col-id">
-          <a class="issue-link" [href]="'http://redmine.yourdomain.com/issues/' + iss.id" target="_blank">#{{ iss.id }}</a>
+          <a class="issue-link" [href]="apiBaseUrl + '/issues/' + iss.id" target="_blank">#{{ iss.id }}</a>
         </span>
         <span class="col-subject" [title]="iss.subject">{{ iss.subject }}</span>
         <span class="col-type">
