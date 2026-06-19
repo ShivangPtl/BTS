@@ -24,11 +24,6 @@ export class RedmineService {
   private _activeVersions: SprintSummary[] = [];  // only status === 'open'
   isLoading = false;   // public so dashboard can show loader
 
-  private readonly publicHolidays: PublicHoliday[] = [
-    { date: '2026-06-11', name: 'Local Public Holiday', hoursDeducted: 8 },
-    { date: '2026-06-19', name: 'Regional Holiday', hoursDeducted: 8 }
-  ];
-
   private projects: RedmineProject[] = [];
 
   // private readonly sprints: SprintSummary[] = [
@@ -403,8 +398,19 @@ export class RedmineService {
     };
   }
 
+  // getPublicHolidays(): Observable<PublicHoliday[]> {
+  //   return of(this.publicHolidays);
+  // }
+
   getPublicHolidays(): Observable<PublicHoliday[]> {
-    return of(this.publicHolidays);
+    const headers = this.getHeaders();
+
+    return this.http.get<PublicHoliday[]>('/bts-api/api/holidays', { headers }).pipe(
+      catchError(err => {
+        console.warn('getPublicHolidays API failed', err);
+        return of([]);
+      })
+    );
   }
 
   getWidgetCatalog(): Observable<WidgetDefinition[]> {
@@ -536,7 +542,7 @@ export class RedmineService {
       projectId: projectId,            // CSV only gives Project Name text strings
       sprintId: 0,             // Reminder: CSV lacks version/sprint details
       issueId: issueId,
-      issueSubject: row[5] ? row[5].replace(/^"|"$/g, '') : '', // Strip outer quotes
+      issueSubject: row[4] + (row[5] ? ' ' + row[5].replace(/^"|"$/g, '') : ''), // Strip outer quotes
       issueType: row[3],
       hours: parseFloat(row[6]) || 0,
       spentOn: formattedDate
@@ -675,12 +681,12 @@ export class RedmineService {
       ...(node.directReports ? this.flattenHierarchy(node.directReports) : [])
     ]);
   }
-  calculateCapacity(startDate: string, endDate: string, hierarchy: UserNode[], entries: TimeEntry[]): CapacitySnapshot {
+  calculateCapacity(startDate: string, endDate: string, hierarchy: UserNode[], entries: TimeEntry[], holidays: PublicHoliday[]): CapacitySnapshot {
     const weekdays = this.countWeekdays(startDate, endDate);
-    const holidays = this.getHolidaysInRange(startDate, endDate);
+    const holidayCount = this.getHolidaysInRange(startDate, endDate, holidays).length;
     const dailyCapacityHours = hierarchy.reduce((sum, node) => sum + this.calculateSubtreeDailyHours(node), 0);
     const grossHours = weekdays * dailyCapacityHours;
-    const holidayDeductionHours = holidays.length * dailyCapacityHours;
+    const holidayDeductionHours = holidayCount * dailyCapacityHours;
 
     // Team users from hierarchy
     const teamUserName = new Set(
@@ -693,8 +699,8 @@ export class RedmineService {
     );
 
     return {
-      workingDays: weekdays - holidays.length,
-      holidayCount: holidays.length,
+      workingDays: weekdays - holidayCount,
+      holidayCount,
       grossHours,
       holidayDeductionHours,
       budgetHours: grossHours - holidayDeductionHours,
@@ -708,12 +714,12 @@ export class RedmineService {
     return ownHours + reporteeHours;
   }
 
-  getHolidaysInRange(startDate: string, endDate: string): PublicHoliday[] {
+  getHolidaysInRange(startDate: string, endDate: string, holidays: PublicHoliday[]): PublicHoliday[] {
     const start = this.toDate(startDate);
     const end = this.toDate(endDate);
 
-    return this.publicHolidays.filter(holiday => {
-      const date = this.toDate(holiday.date);
+    return holidays.filter(holiday => {
+      const date = new Date(holiday.date);
       return date >= start && date <= end && !this.isWeekend(date);
     });
   }

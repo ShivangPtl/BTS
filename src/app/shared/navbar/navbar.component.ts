@@ -3,7 +3,7 @@ import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@a
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AppUserSession, AuthService } from '../../core/services/auth.service';
-import { RedmineProject } from '../../dashboard/dashboard.model';
+import { PublicHoliday, RedmineProject } from '../../dashboard/dashboard.model';
 import { ClickOutsideDirective } from '../click-outside.directive';
 
 export type AppView = 'overview' | 'utilization' | 'sprints' | 'issues' | 'admin';
@@ -35,6 +35,7 @@ export class NavbarComponent implements OnInit {
 
   @Output() selectedViewChange = new EventEmitter<AppView>();
   @Output() filterChange = new EventEmitter<void>();
+  @Input() holidays: PublicHoliday[] = [];
 
   // ── Sprint-specific filters ──
   @Input()  sprintSearch = '';
@@ -293,5 +294,9 @@ export class NavbarComponent implements OnInit {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  getHoliday(date: string): PublicHoliday | undefined {
+    return this.holidays.find(h => h.date.slice(0, 10) === date);
   }
 }

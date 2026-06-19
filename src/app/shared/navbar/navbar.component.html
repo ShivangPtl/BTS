@@ -114,6 +114,21 @@
                   {{ cell.label }}
                 </span>
               </div>
+            <div class="cal-grid">
+              <span class="cal-dow" *ngFor="let d of dow">{{ d }}</span>
+              <span
+                *ngFor="let cell of leftCells"
+                class="cal-cell"
+                [class.empty]="!cell.date"
+                [class.in-range]="cell.date && isInRange(cell.date)"
+                [class.range-start]="cell.date && isStart(cell.date)"
+                [class.range-end]="cell.date && isEnd(cell.date)"
+                [class.today]="cell.date && isToday(cell.date)"
+                [class.holiday]="cell.date && getHoliday(cell.date)"
+                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
+                (click)="cell.date && selectDay(cell.date)">
+                {{ cell.label }}
+              </span>
             </div>
           </div>
           <div class="cal-footer">
@@ -142,6 +157,30 @@
           (ngModelChange)="onSprintSearchChange($event)">
         <button *ngIf="sprintSearch" class="sprint-search-clear" type="button" (click)="clearSprintSearch()">✕</button>
       </div>
+          <!-- Right month -->
+          <div class="cal-month">
+            <div class="cal-header">
+              <div class="cal-nav-spacer"></div>
+              <span>{{ rightMonthLabel }}</span>
+              <button type="button" class="cal-nav-btn" (click)="shiftMonth(1)">›</button>
+            </div>
+            <div class="cal-grid">
+              <span class="cal-dow" *ngFor="let d of dow">{{ d }}</span>
+              <span
+                *ngFor="let cell of rightCells"
+                class="cal-cell"
+                [class.empty]="!cell.date"
+                [class.in-range]="cell.date && isInRange(cell.date)"
+                [class.range-start]="cell.date && isStart(cell.date)"
+                [class.range-end]="cell.date && isEnd(cell.date)"
+                [class.today]="cell.date && isToday(cell.date)"
+                [class.holiday]="cell.date && getHoliday(cell.date)"
+                [title]="cell.date && getHoliday(cell.date) ? getHoliday(cell.date)!.name : ''"
+                (click)="cell.date && selectDay(cell.date)">
+                {{ cell.label }}
+              </span>
+            </div>
+          </div>
 
       <div class="filter-sep"></div>
 
