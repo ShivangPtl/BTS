@@ -5,6 +5,7 @@ import { lastValueFrom } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { RedmineProject, SprintSummary } from '../../dashboard.model';
 import { RedmineService } from '../../../core/services/redmine.service';
+import { environment } from '../../../../environments/environment';
 
 // ── Issue status taxonomy ─────────────────────────────────────────────────
 // Closed    = fully done (QA accepted)
@@ -160,7 +161,7 @@ export class SprintsComponent implements OnChanges, OnInit {
   // ── Issue list view options ────────────────────────────────────────────
   groupByUser = false;
 
-  apiBaseUrl = '/redmine-api';
+  apiBaseUrl = environment.redmineBase;
 
   constructor(private redmineService: RedmineService, private http: HttpClient) {}
 

@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Observable, catchError, map, of, switchMap } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface AppUserSession {
   redmineUserId: number;
@@ -18,8 +19,8 @@ const INACTIVITY_MS  = 5 * 24 * 60 * 60 * 1000;  // 5 days
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly redmineBase = '/redmine-api';
-  private readonly btsBase     = '/bts-api';
+  private readonly redmineBase = environment.redmineBase;
+  private readonly btsBase     = environment.btsBase;
 
   private _session = new BehaviorSubject<AppUserSession | null>(null);
   session$ = this._session.asObservable();

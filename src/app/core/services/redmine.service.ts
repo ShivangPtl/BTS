@@ -10,14 +10,15 @@ import {
   UserNode,
   WidgetDefinition
 } from '../../dashboard/dashboard.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class RedmineService {
   private readonly standardDailyHours = 8;
-  private readonly apiBaseUrl = '/redmine-api';
-  private readonly apiKeyStorageKey = '6d18a984feda82e9a2b028bbe1163f932ccc67a3';
+  private readonly apiBaseUrl = environment.redmineBase;
+  private readonly apiKeyStorageKey = '';
 
   // ── Cache ────────────────────────────────────────────────────────────────
   private _allVersions: SprintSummary[] = [];
