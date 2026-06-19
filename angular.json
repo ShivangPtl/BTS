@@ -57,15 +57,14 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
-          "options": {
-            "proxyConfig": "proxy.conf.json"
-          },
           "configurations": {
             "production": {
-              "buildTarget": "bts-management-dashboard:build:production"
+              "buildTarget": "bts-management-dashboard:build:production",
+              "proxyConfig": "proxy.conf.prod.json"
             },
             "development": {
-              "buildTarget": "bts-management-dashboard:build:development"
+              "buildTarget": "bts-management-dashboard:build:development",
+              "proxyConfig": "proxy.conf.local.json"
             }
           },
           "defaultConfiguration": "development"
